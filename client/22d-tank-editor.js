@@ -534,7 +534,11 @@
             code.value = JSON.stringify(d)
           }
           code.select()
-          try { navigator.clipboard.writeText(code.value) } catch(err) {}
+          if(navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(code.value).catch(function() {})
+          } else {
+            try { document.execCommand('copy') } catch(err) {}
+          }
           return
         }
         const text = code.value.trim()

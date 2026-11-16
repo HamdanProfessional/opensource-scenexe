@@ -7,6 +7,12 @@
         const data = overriding ? game.override : gameData
         renderAmbientParticles = data.ambientParticles
         render.grid = data.grid
+        const custom = render.customBackground, base = data.grid.background
+        render.background = custom && custom.on ? {
+          r: base.r + (custom.r - base.r) * custom.a,
+          g: base.g + (custom.g - base.g) * custom.a,
+          b: base.b + (custom.b - base.b) * custom.a
+        } : base
         render.wallType = data.wallType
         render.darkness = data.darkness || 0
         for(let i=renderAmbientParticles.length-1;i>=0;i--) {
@@ -55,7 +61,7 @@
         render.wallCount = 0
         render.polygonCount = 0
         render.imageCount = 0
-        let v = Math.max(render.grid.background.r, render.grid.background.g, render.grid.background.b)
+        let v = Math.max(render.background.r, render.background.g, render.background.b)
         let q = v > 70 ? v - 70 : 0
         render.wallOpacity = v > 12 ? (v < 30 ? 1 - 0.7 * (v - 12) / 18 : 0.3) : 1
         render.wallColor = {
@@ -364,7 +370,7 @@
         ctx.scale(s, s)
         ctx.translate(-cameraX, -cameraY)
         let transform = ctx.getTransform()
-        ctx.fillStyle = render.rgb(render.grid.background)
+        ctx.fillStyle = render.rgb(render.background)
         text.filter = false
         ctx.fillRect(cameraX - w, cameraY - h, w * 2, h * 2)
         let gridWidth = 5 / cameraSize
@@ -638,7 +644,7 @@
         ctx = renderCtx.mapCanvas
         ctx.resetTransform()
         ctx.clearRect(0, 0, 500, 500)
-        ctx.fillStyle = render.rgb(render.grid.background, 0.82)
+        ctx.fillStyle = render.rgb(render.background, 0.82)
         ctx.fillRect(0, 0, 500, 500)
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.08)'
         ctx.lineWidth = 2

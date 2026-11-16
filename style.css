@@ -2147,6 +2147,24 @@ button {
 .csToggle input:checked + i::after {
   left: 48px;
 }
+.csColor {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  margin: 16px 10px;
+  font-size: 17px;
+  cursor: pointer;
+}
+.csColor input {
+  width: 56px;
+  height: 30px;
+  padding: 0;
+  background: #161616;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
 .csToggle select {
   height: 30px;
   padding: 0 10px;

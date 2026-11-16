@@ -6,6 +6,14 @@
         debugSlide.style.left = v ? '0' : '-500px'
         debugSlide.style.opacity = v ? 1 : 0
       }
+      render.customBackground = { on: false, hex: '#cdcdcd', r: 205, g: 205, b: 205, a: 1 }
+      const setBackgroundColor = function(hex) {
+        const c = render.customBackground
+        c.hex = hex.toLowerCase()
+        c.r = parseInt(hex.slice(1, 3), 16)
+        c.g = parseInt(hex.slice(3, 5), 16)
+        c.b = parseInt(hex.slice(5, 7), 16)
+      }
       const SECTIONS = [
         ['Graphics', [
           ['resolution', 'Resolution', 'range', () => Math.round(render.rq * 100), v => { render.rq = v / 100; if(loaded) { render.resize() } }, 100, 40, 100, 5],
@@ -13,6 +21,11 @@
           ['outline', 'Outline Thickness', 'range', () => Math.round(render.lineWidth * 20), v => { render.lineWidth = v / 20 }, 100, 20, 200, 10],
           ['grid', 'Show Grid', 'check', () => render.showGrid, v => { render.showGrid = v }, true],
           ['flash', 'Damage Flash', 'check', () => render.damageFlash, v => { render.damageFlash = v }, true]
+        ]],
+        ['Map Background', [
+          ['bgCustom', 'Custom Map Background', 'check', () => render.customBackground.on, v => { render.customBackground.on = v }, false],
+          ['bgColor', 'Background Color', 'color', () => render.customBackground.hex, v => { setBackgroundColor(v) }, '#cdcdcd'],
+          ['bgAlpha', 'Background Color Opacity', 'range', () => Math.round(render.customBackground.a * 100), v => { render.customBackground.a = v / 100 }, 100, 0, 100, 5]
         ]],
         ['Opacity', [
           ['opTanks', 'Tanks', 'range', () => Math.round(render.opacity.tanks * 100), v => { render.opacity.tanks = v / 100 }, 100, 10, 100, 5],
@@ -51,6 +64,7 @@
       const valid = function(f, v) {
         if(f[2] === 'check') { return typeof v === 'boolean' }
         if(f[2] === 'select') { return f[6].some(o => o[0] === v) }
+        if(f[2] === 'color') { return typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) }
         return typeof v === 'number' && v >= f[6] && v <= f[7]
       }
       try {
@@ -83,6 +97,8 @@
             const v = f[3]()
             if(f[2] === 'range') {
               h += `<label class="csSlider"><span>${label(f, v)}</span><input type="range" min="${f[6]}" max="${f[7]}" step="${f[8]}" value="${v}" data-key="${f[0]}"></label>`
+            } else if(f[2] === 'color') {
+              h += `<label class="csColor"><span>${f[1]}</span><input type="color" value="${v}" data-key="${f[0]}"></label>`
             } else if(f[2] === 'check') {
               h += `<label class="csToggle"><span>${f[1]}</span><input type="checkbox" data-key="${f[0]}"${v ? ' checked' : ''}><i></i></label>`
             } else {
@@ -122,7 +138,7 @@
       list.addEventListener('input', function(e) {
         const t = e.target, f = FIELDS[t.dataset.key]
         if(!f || f[2] === 'select') { return }
-        const v = f[2] === 'check' ? t.checked : Number(t.value)
+        const v = f[2] === 'check' ? t.checked : (f[2] === 'color' ? t.value : Number(t.value))
         f[4](v)
         if(f[2] === 'range') { t.previousElementSibling.textContent = label(f, v) }
       })
@@ -154,7 +170,7 @@
       window.addEventListener('keydown', function(e) {
         if(!e.isTrusted || e.ctrlKey || e.metaKey || e.altKey) { return }
         const tag = (e.target.tagName || '').toLowerCase()
-        if(tag === 'textarea' || (tag === 'input' && e.target.type !== 'range' && e.target.type !== 'checkbox') || document.activeElement === chat) { return }
+        if(tag === 'textarea' || (tag === 'input' && e.target.type !== 'range' && e.target.type !== 'checkbox' && e.target.type !== 'color') || document.activeElement === chat) { return }
         if(e.keyCode === 79 && !e.repeat) {
           if(open) { cancel() } else { show(true) }
         } else if(e.keyCode === 27 && open) {

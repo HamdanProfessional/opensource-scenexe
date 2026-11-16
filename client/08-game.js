@@ -556,9 +556,8 @@
                 }
                 let data = msgpack.encode(d)
                 let str = game.base64.encode(data)
-                str = btoa(String.fromCharCode.apply(null, pako.gzip(str)))
-                navigator.clipboard.writeText(str)
-                render.addAnnouncement('Copied screenshot as base64 to clipboard!', 5000)
+                str = game.base64.encode(pako.gzip(str))
+                render.addAnnouncement(game.copyText(str) ? 'Copied screenshot as base64 to clipboard!' : 'Could not copy the screenshot to the clipboard.', 5000)
               }
             } else if(e.keyCode === 76) {
               if(gameData.me) { return }
@@ -584,6 +583,22 @@
             game.movement.update()
           }
         }
+      },
+      copyText: function(text) {
+        if(navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(text).catch(function() {})
+          return true
+        }
+        const area = document.createElement('textarea')
+        area.value = text
+        area.style.position = 'fixed'
+        area.style.opacity = '0'
+        document.body.appendChild(area)
+        area.select()
+        let copied = false
+        try { copied = document.execCommand('copy') } catch(e) {}
+        area.remove()
+        return copied
       },
       base64: (function() {
         var fromCharCode = String.fromCharCode;

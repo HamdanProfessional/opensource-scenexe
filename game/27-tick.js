@@ -1,5 +1,25 @@
-  let stallTimes = [], lastAntilag = -Infinity
+  let stallTimes = [], lastAntilag = -Infinity, lastStallLog = {}
+  const stallSummary = function(dim) {
+    let players = 0, owners = new Map()
+    for(let i=dim.tanks.length-1;i>=0;i--) {
+      let t = dim.tanks[i]
+      if(t.ws && t.ws.data && t.ws.data.isPlayer) { players++ }
+    }
+    for(let i=dim.bullets.length-1;i>=0;i--) {
+      let owner = dim.bullets[i].parent
+      for(let k=0;k<10 && owner && owner.parent && owner.parent !== owner;k++) { owner = owner.parent }
+      if(owner) { owners.set(owner, (owners.get(owner) || 0) + 1) }
+    }
+    let top = [...owners].sort(function(a, b) { return b[1] - a[1] }).slice(0, 3).map(function(e) {
+      return `${e[0].name || 'unnamed'} (${e[0].weapon || '?'}-${e[0].body || '?'}) ${e[1]}`
+    })
+    return `${players} players, ${dim.tanks.length} tanks, ${dim.bullets.length} bullets, ${dim.polygons.length} shapes${top.length ? ', most bullets: ' + top.join(', ') : ''}`
+  }
   const antilagCheck = function(now, stall, dim) {
+    if(!(now - (lastStallLog[dim.name] || -Infinity) < 5000)) {
+      lastStallLog[dim.name] = now
+      try { console.log(`stall: ${Math.round(stall)}ms in ${dim.name}: ${stallSummary(dim)}`) } catch(e) {}
+    }
     if(stallTimes.length === 0 || now - stallTimes[stallTimes.length - 1] > 1000) { stallTimes.push(now) }
     while(stallTimes.length && stallTimes[0] < now - 10000) { stallTimes.shift() }
     if((stall > 2000 || stallTimes.length >= 3) && now - lastAntilag > 15000) {

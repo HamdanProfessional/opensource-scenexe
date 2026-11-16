@@ -19,9 +19,9 @@ const discordBot = (function() {
       chatLogs: '1571966169550950580',
       welcome: '1522765954486894663',
       updates: '1571966516943921264',
+      announcements: '1522849720559730768',
       commandLogs: '1571967677788848158'
     },
-    updatesRole: '',
     statusSeconds: 60,
     spamMessages: 6,
     spamSeconds: 5,
@@ -187,7 +187,6 @@ const discordBot = (function() {
     }
   }
 
-  const updatesDir = require('path').join(__dirname, 'updates')
   const statePath = require('path').join(__dirname, 'discord-state.json')
 
   const readState = function() {
@@ -221,42 +220,78 @@ const discordBot = (function() {
     return parts.map(function(p) { return p.slice(0, 2000) })
   }
 
-  const postUpdates = async function() {
+  const noteSources = [
+    { dir: 'announcements', channel: 'announcements' },
+    { dir: 'updates', channel: 'updates' }
+  ]
+  let postingNotes = false
+
+  const firstLine = function(text) {
+    return text.trim().split('\n')[0].trim()
+  }
+
+  const postedTitles = async function(channel) {
+    const titles = new Set()
+    let before
+    for(let page = 0; page < 3; page++) {
+      const batch = await channel.messages.fetch(before ? { limit: 100, before: before } : { limit: 100 })
+      batch.forEach(function(message) {
+        if(message.author.id === client.user.id && message.content) { titles.add(firstLine(message.content)) }
+      })
+      if(batch.size < 100) { break }
+      before = batch.last().id
+    }
+    return titles
+  }
+
+  const postNotes = async function(source, state) {
     let files = []
     try {
-      files = fs.readdirSync(updatesDir).filter(function(f) { return f.endsWith('.md') }).sort()
+      files = fs.readdirSync(require('path').join(__dirname, source.dir)).filter(function(f) { return f.endsWith('.md') }).sort().slice(-5)
     } catch(e) {
       return
     }
-    if(!files.length) { return }
-    const state = readState()
-    const firstRun = !Array.isArray(state.postedUpdates)
     const posted = new Set(state.postedUpdates || [])
-    let pending = files.filter(function(f) { return !posted.has(f) })
-    if(firstRun) { pending = pending.slice(-1) }
-    if(pending.length) {
-      const channel = await getChannel('updates')
-      if(!channel) { return }
-      const role = settings.updatesRole
-      for(const file of pending) {
-        const text = fs.readFileSync(require('path').join(updatesDir, file)).toString().trim() + (role ? `\n\n<@&${role}>` : '')
+    const pending = files.filter(function(f) { return !posted.has(`${source.dir}/${f}`) })
+    if(!pending.length) { return }
+    const channel = await getChannel(source.channel)
+    if(!channel) { return }
+    let titles
+    try {
+      titles = await postedTitles(channel)
+    } catch(e) {
+      console.log(`discord: can't read the ${source.channel} channel history, not posting:`, e.message)
+      return
+    }
+    for(const file of pending) {
+      const text = fs.readFileSync(require('path').join(__dirname, source.dir, file)).toString().trim()
+      if(!titles.has(firstLine(text))) {
         try {
           for(const part of splitMessage(text)) {
-            await channel.send({ content: part, allowedMentions: { roles: role ? [role] : [] } })
+            await channel.send({ content: part, allowedMentions: { parse: [] } })
           }
         } catch(e) {
-          console.log(`discord: posting update ${file} failed:`, e.message)
-          break
+          console.log(`discord: posting ${source.dir}/${file} failed:`, e.message)
+          return
         }
-        posted.add(file)
+      }
+      posted.add(`${source.dir}/${file}`)
+      state.postedUpdates = [...posted]
+      try {
+        fs.writeFileSync(statePath, JSON.stringify(state, null, 2))
+      } catch(e) {
+        console.log('discord: saving discord-state.json failed:', e.message)
       }
     }
-    if(firstRun) { files.forEach(function(f) { posted.add(f) }) }
-    state.postedUpdates = [...posted]
-    try {
-      fs.writeFileSync(statePath, JSON.stringify(state, null, 2))
-    } catch(e) {
-      console.log('discord: saving discord-state.json failed:', e.message)
+  }
+
+  const postUpdates = async function() {
+    if(postingNotes) { return }
+    postingNotes = true
+    const state = readState()
+    if(!Array.isArray(state.postedUpdates)) { state.postedUpdates = [] }
+    for(const source of noteSources) {
+      await postNotes(source, state)
     }
   }
 
