@@ -532,8 +532,8 @@
           }
         } if(alpha < 1) {
           ctx.globalAlpha = alpha * render.drawAlpha
-        } else if(ctx.globalAlpha < 1) {
-          ctx.globalAlpha = 1
+        } else if(ctx.globalAlpha !== render.drawAlpha) {
+          ctx.globalAlpha = render.drawAlpha
         }
       },
       rgb: function (color, alpha) {

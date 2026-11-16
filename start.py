@@ -5,6 +5,8 @@ import stat
 import subprocess
 import sys
 import tarfile
+import hashlib
+import json
 import tempfile
 import urllib.request
 import zipfile
@@ -13,6 +15,11 @@ NODE_VERSION = 'v22.11.0'
 ROOT = os.path.dirname(os.path.abspath(__file__))
 RUNTIME_DIR = os.path.join(ROOT, 'runtime')
 DIST_BASE = f'https://nodejs.org/dist/{NODE_VERSION}'
+REPO = 'HamdanProfessional/opensource-scenexe'
+BRANCH = 'main'
+VERSION_FILE = os.path.join(ROOT, '.update-version')
+MANIFEST_FILE = os.path.join(ROOT, '.update-manifest')
+KEEP_IF_PRESENT = {'config.json'}
 
 
 def log(message):
@@ -126,8 +133,101 @@ def deps_present():
     return True
 
 
-def ensure_deps(node_bin):
-    if deps_present():
+def fetch(url, accept=None):
+    headers = {'User-Agent': 'open-scenexe-launcher'}
+    if accept:
+        headers['Accept'] = accept
+    with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=30) as response:
+        return response.read()
+
+
+def read_text(path):
+    try:
+        with open(path, encoding='utf-8') as f:
+            return f.read().strip()
+    except OSError:
+        return ''
+
+
+def file_hash(path):
+    try:
+        with open(path, 'rb') as f:
+            return hashlib.sha256(f.read()).hexdigest()
+    except OSError:
+        return ''
+
+
+def latest_commit():
+    return fetch(f'https://api.github.com/repos/{REPO}/commits/{BRANCH}', 'application/vnd.github.sha').decode().strip()
+
+
+def safe_target(relative):
+    target = os.path.realpath(os.path.join(ROOT, relative))
+    if os.path.commonpath([target, os.path.realpath(ROOT)]) != os.path.realpath(ROOT):
+        raise RuntimeError(f'unsafe path in update archive: {relative}')
+    return target
+
+
+def apply_update(commit):
+    archive = os.path.join(tempfile.gettempdir(), f'open-scenexe-{commit}.tar.gz')
+    with open(archive, 'wb') as f:
+        f.write(fetch(f'https://codeload.github.com/{REPO}/tar.gz/{commit}'))
+    installed = []
+    with tarfile.open(archive) as t:
+        for member in t.getmembers():
+            if not member.isfile():
+                continue
+            parts = member.name.split('/', 1)
+            if len(parts) < 2 or not parts[1]:
+                continue
+            relative = parts[1]
+            installed.append(relative)
+            target = safe_target(relative)
+            if relative in KEEP_IF_PRESENT and os.path.exists(target):
+                continue
+            os.makedirs(os.path.dirname(target), exist_ok=True)
+            source = t.extractfile(member)
+            with open(target, 'wb') as out:
+                shutil.copyfileobj(source, out)
+    os.remove(archive)
+    previous = read_text(MANIFEST_FILE).splitlines()
+    current = set(installed)
+    for relative in previous:
+        if relative and relative not in current and relative not in KEEP_IF_PRESENT:
+            target = safe_target(relative)
+            if os.path.isfile(target):
+                os.remove(target)
+                log(f'removed {relative}')
+    with open(MANIFEST_FILE, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(sorted(current)))
+    with open(VERSION_FILE, 'w', encoding='utf-8') as f:
+        f.write(commit)
+    return len(installed)
+
+
+def update_from_github():
+    if os.path.isdir(os.path.join(ROOT, '.git')):
+        log('git checkout found, skipping update (use git pull)')
+        return
+    try:
+        commit = latest_commit()
+    except Exception as error:
+        log(f'update check failed, starting current version ({error})')
+        return
+    if commit == read_text(VERSION_FILE):
+        log(f'up to date ({commit[:7]})')
+        return
+    log(f'updating to {commit[:7]} from github.com/{REPO}')
+    try:
+        count = apply_update(commit)
+    except Exception as error:
+        log(f'update failed, starting current version ({error})')
+        return
+    log(f'updated {count} files')
+
+
+def ensure_deps(node_bin, force=False):
+    if deps_present() and not force:
         log('dependencies already installed')
         return
     cli = npm_cli_js(node_bin)
@@ -145,8 +245,12 @@ def ensure_deps(node_bin):
 
 
 def main():
+    lock_before = file_hash(os.path.join(ROOT, 'package-lock.json'))
+    if '--no-update' not in sys.argv:
+        update_from_github()
+    lock_changed = file_hash(os.path.join(ROOT, 'package-lock.json')) != lock_before
     node_bin = ensure_node()
-    ensure_deps(node_bin)
+    ensure_deps(node_bin, lock_changed)
     log('starting server')
     try:
         return subprocess.call([node_bin, 'server.js'], cwd=ROOT)

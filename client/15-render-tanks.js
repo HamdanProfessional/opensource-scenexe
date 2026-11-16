@@ -108,7 +108,7 @@
         }
       },
       noElements: [],
-      selfStealthFloor: 0.3,
+      selfStealthFloor: 0.15,
       stealthAlpha: function(tank) {
         if(tank.stealthFrame !== render.now) {
           tank.stealthFrame = render.now
