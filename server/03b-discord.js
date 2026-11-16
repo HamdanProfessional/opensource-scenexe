@@ -18,8 +18,10 @@ const discordBot = (function() {
       spam: '1571967960912765059',
       chatLogs: '1571966169550950580',
       welcome: '1522765954486894663',
+      updates: '1571966516943921264',
       commandLogs: '1571967677788848158'
     },
+    updatesRole: '',
     statusSeconds: 60,
     spamMessages: 6,
     spamSeconds: 5,
@@ -182,6 +184,79 @@ const discordBot = (function() {
     } catch(e) {
       statusMessage = null
       console.log('discord: status update failed:', e.message)
+    }
+  }
+
+  const updatesDir = require('path').join(__dirname, 'updates')
+  const statePath = require('path').join(__dirname, 'discord-state.json')
+
+  const readState = function() {
+    try {
+      return JSON.parse(fs.readFileSync(statePath).toString())
+    } catch(e) {
+      return {}
+    }
+  }
+
+  const splitMessage = function(text) {
+    const parts = []
+    let current = ''
+    const blocks = []
+    for(const block of text.split('\n\n')) {
+      const last = blocks[blocks.length - 1]
+      if(last !== undefined && /^\*\*[^\n]*\*\*$/.test(last) && blocks.length > 1) {
+        blocks[blocks.length - 1] = last + '\n\n' + block
+      } else {
+        blocks.push(block)
+      }
+    }
+    for(const block of blocks) {
+      if(current && current.length + block.length > 1900) {
+        parts.push(current.trim())
+        current = ''
+      }
+      current += (current ? '\n\n' : '') + block
+    }
+    if(current.trim()) { parts.push(current.trim()) }
+    return parts.map(function(p) { return p.slice(0, 2000) })
+  }
+
+  const postUpdates = async function() {
+    let files = []
+    try {
+      files = fs.readdirSync(updatesDir).filter(function(f) { return f.endsWith('.md') }).sort()
+    } catch(e) {
+      return
+    }
+    if(!files.length) { return }
+    const state = readState()
+    const firstRun = !Array.isArray(state.postedUpdates)
+    const posted = new Set(state.postedUpdates || [])
+    let pending = files.filter(function(f) { return !posted.has(f) })
+    if(firstRun) { pending = pending.slice(-1) }
+    if(pending.length) {
+      const channel = await getChannel('updates')
+      if(!channel) { return }
+      const role = settings.updatesRole
+      for(const file of pending) {
+        const text = fs.readFileSync(require('path').join(updatesDir, file)).toString().trim() + (role ? `\n\n<@&${role}>` : '')
+        try {
+          for(const part of splitMessage(text)) {
+            await channel.send({ content: part, allowedMentions: { roles: role ? [role] : [] } })
+          }
+        } catch(e) {
+          console.log(`discord: posting update ${file} failed:`, e.message)
+          break
+        }
+        posted.add(file)
+      }
+    }
+    if(firstRun) { files.forEach(function(f) { posted.add(f) }) }
+    state.postedUpdates = [...posted]
+    try {
+      fs.writeFileSync(statePath, JSON.stringify(state, null, 2))
+    } catch(e) {
+      console.log('discord: saving discord-state.json failed:', e.message)
     }
   }
 
@@ -683,6 +758,7 @@ const discordBot = (function() {
     }
     send('gameStatus', 'Server started')
     setTimeout(function() { updateStatus(false) }, 10000)
+    postUpdates()
     setInterval(function() {
       if(!stopping) { updateStatus(false) }
     }, Math.max(15, settings.statusSeconds) * 1000)
