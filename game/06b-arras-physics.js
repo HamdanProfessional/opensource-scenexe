@@ -240,7 +240,11 @@
         let aim = tank.mousePosition
         bullet.boomerangGoal = [tank.x + c.boomerangReach * (aim[0] - tank.x), tank.y + c.boomerangReach * (aim[1] - tank.y)]
       }
-      if(data.arras.goToTarget) { arrasPhysics.aimAtTarget(bullet, turret ? turret.aimPoint : tank.mousePosition) }
+      if(data.arras.goToTarget) {
+        let point = turret ? turret.aimPoint : tank.mousePosition
+        if(data.arras.reverseTarget && point) { point = [2 * tank.x - point[0], 2 * tank.y - point[1]] }
+        arrasPhysics.aimAtTarget(bullet, point)
+      }
     },
     aimAtTarget: function(bullet, point) {
       let speed = Math.hypot(bullet.xv, bullet.yv)
