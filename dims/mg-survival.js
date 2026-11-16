@@ -7,7 +7,7 @@
   const COUNTDOWN_MS = 5000
   const SPAWN_GAP_MS = 400
   const ENEMIES = {
-    thorn: { name: 'Beta Thorn', weapon: 'node', body: 'thorn', level: 30 },
+    thorn: { name: 'Beta Thorn', weapon: 'trapper', body: 'thorn', level: 30 },
     saw: { name: 'Alpha Saw', weapon: 'node', body: 'saw', level: 45 }
   }
 
@@ -94,12 +94,15 @@
       const target = nearestPlayer(bot)
       if(!target) {
         bot.input.movement = [0, 0]
+        bot.firing = false
         return
       }
       const dx = target.x - bot.x, dy = target.y - bot.y
       const r = Math.sqrt(dx * dx + dy * dy) || 1
       bot.input.movement = [dx / r, dy / r]
       bot.mousePosition = [target.x, target.y]
+      bot.controlPosition = [dx, dy]
+      bot.firing = r < 900
       bot.d = Math.atan2(-dx, dy)
     }
   }
@@ -129,8 +132,11 @@
       radiant: 0,
       team: SWARM_TEAM,
       forceDeathScore: 0,
-      noKillNotification: true
+      noKillNotification: true,
+      invincible: false
     })
+    bot.invincible = false
+    bot.invincibleTime = false
     bot.ai = chase(bot)
     state.swarm.push(bot)
   }
