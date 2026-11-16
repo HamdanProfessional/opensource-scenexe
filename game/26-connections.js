@@ -112,6 +112,7 @@
                 const clean = words.cleanName(String(name).slice(0, 50))
                 name = clean.name
                 if(clean.bad) {
+                  discordReport('profanity', 'tried to join with a blocked name', String(data[1][0]).slice(0, 50), ws)
                   setTimeout(function() {
                     ws.sendPacket('announcement', 'That name isn\'t allowed, so you are playing without one.')
                   }, 500)
@@ -208,6 +209,7 @@
               if(ws.data.tank) {
                 let a = commands.execute(message.slice(0, 2000), ws.data.tank, ws)
                 if(a) {
+                  discordReport('commandLogs', `used a command (${ws.data.role})`, message.slice(0, 300), ws)
                   commandLogs.write(['command used', ws.data.tank.dim ? ws.data.tank.dim.name : 'undefined', ws.accountNameParsed, ws.data.role, message].join(' ') + '\n')
                 }
                 if(a && ws.accountName) {
@@ -217,15 +219,21 @@
                 }
               }
             } else {
+              const original = message ? String(message).slice(0, 100) : ''
               if(message) {
-                message = words.mask(String(message).slice(0, 100))
+                message = words.mask(original)
                 if(words.isBad(message)) {
+                  discordReport('profanity', 'tried to send a blocked message', original, ws)
                   ws.sendPacket('announcement', 'That message has words that aren\'t allowed.')
                   return
                 }
               }
+              if(message && message !== original) {
+                discordReport('profanity', 'said (filtered in game)', original, ws)
+              }
               let now = _performance.now()
               if(now - ws.data.lastChat < 750) {
+                discordReport('spam', 'is sending chat messages too quickly', '', ws, 30000)
                 ws.sendPacket('announcement', 'You are sending chat messages too quickly. Please slow down.')
               } else if(ws.data.tank && message && message.length > 0) {
                 ws.data.lastChat = now
@@ -235,6 +243,7 @@
                 } else {
                   const checked = words.spam(ws.data.spam || (ws.data.spam = {}), message, now)
                   if(checked.error) {
+                    if(checked.error.startsWith('Muted')) { discordReport('spam', 'was muted for chat spam', message, ws) }
                     ws.sendPacket('announcement', checked.error)
                   } else {
                     ws.data.tank.chat(checked.message)

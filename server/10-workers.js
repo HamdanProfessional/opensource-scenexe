@@ -1,5 +1,6 @@
-const staffAction = function(type, a) {
+const staffAction = function(type, a, notify) {
   const reply = function(uid, text) {
+    if(notify) { return notify(text) }
     let c = uids[uid]
     if(c && c.sendPacket) { c.sendPacket('announcement', text) }
   }
@@ -8,10 +9,15 @@ const staffAction = function(type, a) {
     c.sendPacket = function() {}
     try { c.close() } catch(e) {}
   }
+  const actor = function(id) {
+    let c = uids[id]
+    return c ? (c.accountName || c.data.name || 'unnamed') : String(id)
+  }
   if(type === 'kick') {
     let c = uids[a[0]]
     if(!c) { return reply(a[1], 'That player already left.') }
-    console.log('kick', c.accountName || c.data.name, c._ip, 'by', uids[a[1]] && (uids[a[1]].accountName || uids[a[1]].data.name))
+    console.log('kick', c.accountName || c.data.name, c._ip, 'by', actor(a[1]))
+    discordBot.send('gameLogs', `${discordBot.player(c)} was kicked by ${discordBot.clean(actor(a[1]), 60)}`)
     drop(c, 'kicked')
   } else if(type === 'ban') {
     let c = uids[a[0]], me = uids[a[1]]
@@ -23,7 +29,8 @@ const staffAction = function(type, a) {
     lines.push(`${c._ip} ${name}`.trim())
     writeBans(lines)
     for(const k of clients.slice()) { if(k._ip === c._ip) { drop(k, 'banned') } }
-    console.log('ban', c._ip, name, 'by', me && (me.accountName || me.data.name))
+    console.log('ban', c._ip, name, 'by', actor(a[1]))
+    discordBot.send('gameLogs', `${discordBot.player(c)} was banned by ${discordBot.clean(actor(a[1]), 60)}`)
     reply(a[1], `Banned ${name || c._ip}. Undo with /unban ${c._ip}`)
   } else if(type === 'unban') {
     let key = String(a[0]).toLowerCase(), before = readBans()
@@ -34,6 +41,7 @@ const staffAction = function(type, a) {
     })
     if(lines.length === before.length) { return reply(a[1], `No ban found for '${a[0]}'.`) }
     writeBans(lines)
+    discordBot.send('gameLogs', `${discordBot.clean(actor(a[1]), 60)} removed ${before.length - lines.length} game ban${before.length - lines.length > 1 ? 's' : ''} for ${discordBot.code(a[0], 60)}`)
     reply(a[1], `Removed ${before.length - lines.length} ban${before.length - lines.length > 1 ? 's' : ''}.`)
   } else if(type === 'setRole') {
     let account = String(a[0]).toLowerCase(), role = a[1]
@@ -46,7 +54,8 @@ const staffAction = function(type, a) {
       commandData.data[account] = { role: role }
     }
     try { commandData.set() } catch(e) { return reply(a[2], `Couldn't save command-data.txt: ${e.message}`) }
-    console.log('role', account, role, 'by', uids[a[2]] && uids[a[2]].accountName)
+    console.log('role', account, role, 'by', actor(a[2]))
+    discordBot.send('gameLogs', `${discordBot.clean(account, 50)} is now ${role} (set by ${discordBot.clean(actor(a[2]), 60)})`)
     reply(a[2], `${account} is now ${role}. It applies when they rejoin or change dimension.`)
   }
 }
@@ -169,6 +178,7 @@ const create = function(type, port, replace) {
       })
     } else if(message[0] === 'ascension') {
       let accountName = message[1][0]
+      discordBot.send('gameLogs', `${discordBot.clean(accountName, 50)} ascended`)
       Accounts.fromUsername(accountName).then(function(d) {
         if(d.success) {
           let a = d.account
@@ -242,6 +252,12 @@ const create = function(type, port, replace) {
     } else if(message[0] === 'death') {
       let c = uids[message[1][0]]
       if(c) {
+        let info = message[1][2]
+        if(info && info[2]) {
+          let killers = (info[0] || []).slice(0, 3).map(n => discordBot.clean(n, 40) || 'unnamed').join(', ')
+          let where = c.fsocket && c.fsocket.dim ? ` in *${discordBot.clean(c.fsocket.dim[1][1], 50)}*` : ''
+          discordBot.send('gameLogs', `${discordBot.player(c)} died${killers ? ' to ' + killers : ''}${where} (score ${Math.round(info[2][0]).toLocaleString('en-US')}, level ${info[2][1]}, ${info[2][3]} kills, alive ${discordBot.duration(info[2][2])})`)
+        }
         c.data.respawnScore = message[1][1]
         c.data.lastTeam = message[1][3]
         let spectating = message[1][2] && message[1][2][2]
@@ -256,7 +272,10 @@ const create = function(type, port, replace) {
       }
     } else if(message[0] === 'log') {
       console.log(message[1])
+    } else if(message[0] === 'discord') {
+      discordBot.fromWorker(message[1])
     } else if(message[0] === 'globalAnnounce') {
+      discordBot.send('gameLogs', `Global announcement from in game: ${discordBot.code(message[1])}`)
       for(let q in workers) {
         let w = workers[q]
         w.worker.postMessage(message)
@@ -270,8 +289,13 @@ const create = function(type, port, replace) {
     }
   });
   let deleted = false
+  worker.on('error', function(e) {
+    console.log('worker error', type, e)
+    discordBot.send('gameStatus', `${type} crashed: ${discordBot.code(e && e.message || e)}`)
+  })
   worker.on("exit", function() {
     console.log('exited, creating new')
+    if(!locked) { discordBot.send('gameStatus', deleted ? `${type} restarted` : `${type} stopped unexpectedly and is restarting`) }
     create(type, port, true)
   })
   let w = {

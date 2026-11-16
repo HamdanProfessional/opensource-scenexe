@@ -14,7 +14,10 @@
         }],
         [['*'], function(data, tank, ws) {
           let name = words.stripEmoji(data[0])
-          if(words.isBad(name)) { return ws.sendPacket('announcement', 'That name isn\'t allowed.') }
+          if(words.isBad(name)) {
+            discordReport('profanity', 'tried to rename to a blocked name', name, ws)
+            return ws.sendPacket('announcement', 'That name isn\'t allowed.')
+          }
           tank.name = name.slice(0, 50)
           tank.dim.updatedTanks[tank.id] = tank
         }],

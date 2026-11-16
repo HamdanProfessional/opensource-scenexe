@@ -149,6 +149,8 @@ let filter = {
     if(l > 300 && attackmode - now < 110000) {
       setTimeout(function() {
         console.log('Attack Mode', l)
+        discordBot.send('spam', `Attack mode on: ${l} connection requests in a short time`)
+        discordBot.send('gameStatus', 'Attack mode on, the server is getting flooded with connections')
         attackmode = now + 120000
         if(now - lastTrigger > 20000) {
           lastTrigger = now
@@ -162,6 +164,7 @@ let filter = {
               console.log('Suspicious ip', ip, r)
               if(r >= 3) {
                 console.log('Cloudflare ban', ip, r)
+                discordBot.send('spam', `Cloudflare ban for ${discordBot.code(ip)}`)
                 ips.push(ip)
               }
             }

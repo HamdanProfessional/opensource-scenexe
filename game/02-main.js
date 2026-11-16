@@ -3,6 +3,17 @@ const main = function(tankData, args) {
     console.log(e)
   })
 
+  const discordReport = function(channel, label, value, ws, throttle) {
+    if(!args.parentPort || args.standalone || !ws || !ws.data) { return }
+    if(throttle) {
+      let now = Date.now(), key = 'reported-' + channel
+      if(now - (ws.data[key] || 0) < throttle) { return }
+      ws.data[key] = now
+    }
+    let tank = ws.data.tank
+    args.parentPort.postMessage(['discord', [channel, label, value || '', ws.data.uid >= 0 ? ws.data.uid : -1, tank && tank.dim ? tank.dim.name : '', tank ? tank.name : '']])
+  }
+
   let sendAchievement = function(tank, t) {
     if(tank && tank.ws && tank.ws.accountName && !tank.dim.sandbox) {
       args.parentPort.postMessage(['achievement', [tank.ws.accountName, t]])

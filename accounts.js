@@ -38,7 +38,7 @@ process.on('exit', function() { if(saveTimer) { flushNow() } })
 for(const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
   process.on(sig, function() {
     if(saveTimer) { flushNow() }
-    process.exit(0)
+    if(process.listenerCount(sig) === 1) { process.exit(0) }
   })
 }
 

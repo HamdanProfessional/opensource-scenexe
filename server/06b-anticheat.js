@@ -72,6 +72,7 @@ const anticheat = (function() {
     const who = ws.accountName || ws.data && ws.data.name || ''
     const line = `[${new Date().toISOString()}] ${ws._ip} ${who ? '"' + who + '" ' : ''}${reason}`
     console.log('anticheat', line)
+    discordBot.send('spam', `${discordBot.player(ws)}${discordBot.ip(ws)} ${discordBot.code(reason)}`)
     try { fs.appendFileSync(logPath, line + '\n') } catch(e) {}
   }
 

@@ -104,11 +104,15 @@ server.on("connection", (ws, request) => {
     ws.sending = false
     ws.fsocket.addEventListener('open', function() {
       ws.data.commands = { role: commandData.role(ws.accountName || accountName) }
+      let shownName = words.cleanName(String((tank ? tank[0].name : name) || '')).name
+      let where = discordBot.clean(fsocket.dim ? fsocket.dim[1][1] : dim, 50)
+      if(!ws.data.joinedAt) { ws.data.joinedAt = Date.now() }
+      discordBot.send('gameLogs', tank ? `${discordBot.player(ws, shownName)} went to *${where}*` : `${discordBot.player(ws, shownName)} joined *${where}*`)
       if(tank) {
         ws.data.name = fsocket.tankName = tank[0].name
         fsocket.send(pack([game.codes.send.joinGame, [name, dim, [], tank, ws.data.commands, joinMode]]))
       } else {
-        ws.data.name = name
+        ws.data.name = shownName
         fsocket.tankName = name
         fsocket.send(pack([game.codes.send.joinGame, [name, dim, [], [false, ws.data.respawnScore], ws.data.commands, joinMode]]))
       }
@@ -154,6 +158,7 @@ server.on("connection", (ws, request) => {
         console.log('attempt create username:', data[1][0])
         let u = data[1][0], p = data[1][1]
         if(typeof u === 'string' && words.isBad(u)) {
+          discordBot.send('profanity', `Someone${discordBot.ip(ws)} tried to create an account named ||${discordBot.clean(u, 100)}||`)
           ws.sendPacket('flag', ['login', 0, 'That username isn\'t allowed'])
           return
         }
@@ -166,6 +171,7 @@ server.on("connection", (ws, request) => {
             d.account.account.lastOnline = Math.floor(Date.now() / 1000)
             ws.sendPacket('flag', ['login', accountToObject(d.account.account)])
             console.log('Login', d.account.account.username)
+            discordBot.send('gameLogs', `New account: ${discordBot.clean(d.account.account.username, 50)}`)
             ws.account = d.account
             ws.accountName = d.account.account.username
             ws.accountNameParsed = u
@@ -235,6 +241,7 @@ server.on("connection", (ws, request) => {
                 locked = true
                 let t = 61
                 console.log('closing server')
+                discordBot.send('gameStatus', `Server closing in 60 seconds (${discordBot.clean(ws.accountName, 50)} used /exit)`)
                 let f = function() {
                   for(let q in workers) {
                     let w = workers[q]
@@ -243,7 +250,7 @@ server.on("connection", (ws, request) => {
                   console.log('exiting')
                   setTimeout(function() {
                     console.log('WARNING: process.exit(0)')
-                    process.exit(0)
+                    discordBot.shutdown('closed with /exit')
                   }, 10000)
                 }
                 let k = setInterval(function() {
@@ -317,6 +324,7 @@ server.on("connection", (ws, request) => {
               for(let i=clients.length-1;i>=0;i--) {
                 let p = clients[i]
                 if(p.captchaToken === r) {
+                  discordBot.send('spam', `${discordBot.player(ws)}${discordBot.ip(ws)} reused a session token that is already connected (multiboxing or a bot)`)
                   ws.sendPacket('test', false)
                   return
                 }
@@ -362,6 +370,9 @@ server.on("connection", (ws, request) => {
   ws.addEventListener('close', function() {
     ws.data.open = false
     console.log(`Disconnection`, ws._ip)
+    if(ws.data.joinedAt) {
+      discordBot.send('gameLogs', `${discordBot.player(ws)} left after ${discordBot.duration((Date.now() - ws.data.joinedAt) / 1000)}`)
+    }
     current.remove(ws)
     const remove = function() {
       let j = uids[ws.data.id]
