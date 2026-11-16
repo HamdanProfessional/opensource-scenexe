@@ -71,6 +71,9 @@
         return c || { r:0, g:0, b:0 }
       },
       portalParticles: function(wormhole) {
+        if(!render.inFOV({ x: wormhole.x, y: wormhole.y, size: wormhole.size * 2 + 120 })) {
+          return
+        }
         let r = wormhole.size
         for(let i=0,l=render.round(40 * render.particles);i<l;i++) {
           let a = Math.random() * 2 * Math.PI, sin = Math.sin(a), cos = Math.cos(a), s = 5 + r / 3 * Math.random(), k = r - s, d = 50 + 50 * Math.random() + k
@@ -91,7 +94,7 @@
         }
       },
       tankSpawnParticles: function(tank, o) {
-        if(tank.invisible || (firstUpdate && !o)) {
+        if(tank.invisible || (firstUpdate && !o) || !render.inFOV({ x: tank.x, y: tank.y, size: tank.size + 470 })) {
           return
         }
         let r = tank.size

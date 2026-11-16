@@ -287,7 +287,7 @@
             let auraX = tank.x + tank.size * (aura.x * cos + aura.y * sin)
             let auraY = tank.y + tank.size * (aura.x * sin - aura.y * cos)
             let size = aura.auraSize * tank.size
-            if(!tank.passive) {
+            if(!tank.passive && render.inFOV({ x: auraX, y: auraY, size: size + 20 })) {
               let particles = render.round(render.particles * size * 0.003) * (aura.particles >= 0 ? aura.particles : 1)
               for(let u=0;u<particles;u++) {
                 let a = Math.random() * 2 * Math.PI

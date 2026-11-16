@@ -1,5 +1,8 @@
       drawWormhole: function (wormhole) {
         wormhole.size = util.average(wormhole.size, wormhole._size, 5)
+        if(!render.inFOV({ x: wormhole.x, y: wormhole.y, size: wormhole.size * 2 + 200 })) {
+          return
+        }
         ctx.lineJoin = ctx.lineCap = "round";
         ctx.lineWidth = render.lineWidth;
         let transform = ctx.getTransform();

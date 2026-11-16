@@ -39,8 +39,6 @@
       }
       tank.invincible = true;
       tank.invincibleTime = _performance.now() + 15000;
-      setTimeout(function () {
-      });
       return [0, 0];
     },
   });
@@ -132,7 +130,7 @@
     });
 
   let sanctuary = function ($) {
-    setInterval(function () {
+    $.every(function () {
       if (0.9 > Math.random()) {
         let e = wormhole.count($, 0),
           t = 0;

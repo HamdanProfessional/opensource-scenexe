@@ -82,6 +82,10 @@ const EXTRA_UPGRADES = {
   launcher: [{ name: 'rocketeer', level: 45 }]
 }
 
+const DRONE_TOUGHNESS = {
+  bigCheese: 2.5
+}
+
 const MAX_PROJECTILE_GUN_DEPTH = 2
 
 const round = function(value, places) {
@@ -447,6 +451,11 @@ const makeConverter = function(classTable, report) {
       weaponTurrets: convertTurrets(resolved.TURRETS, {}, 'under'),
       renderBody: key,
       pairedBody: key
+    }
+    if(DRONE_TOUGHNESS[name]) {
+      for(const barrel of weapon.barrels) {
+        if(barrel.type === 2) { barrel.penetration = round(FAMILY_REFERENCE.drone.penetration * DRONE_TOUGHNESS[name]) }
+      }
     }
     return { key, weapon, body }
   }

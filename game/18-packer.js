@@ -316,9 +316,12 @@
       }
       const removed = [[], [], []]
       state.seq ++
-      const sendTanks = net.pick(state, 0, options.tanks, removed[0], function(t) {
+      const shownTanks = visible ? options.tanks.filter(function(t) {
+        return t === viewer || visible[t.id] || t.alwaysShowOnMinimap || dimension.isSameTeam(viewer, t)
+      }) : options.tanks
+      const sendTanks = net.pick(state, 0, shownTanks, removed[0], function(t) {
         if(t === viewer || dim.updatedTanks[t.id]) { return 1 }
-        if(visible && !visible[t.id] && !t.alwaysShowOnMinimap) { return net.tanks[2] }
+        if(visible && !visible[t.id]) { return net.tanks[2] }
         return net.tanks[isNear(t) ? 0 : 1]
       }, function(t, i) {
         if(i === 0) { return Math.floor((1 - t.health / t.maxHealth) * 100) || 0 }

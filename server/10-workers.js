@@ -66,7 +66,7 @@ const create = function(type, port, replace) {
         secret: secret,
         network: config.network || {},
         tickRate: config.tickRate || 60,
-        start: `load('./dims/${type}.js')`
+        start: `load('./dims/${type.replace(':', '-')}.js')`
       }
     }
   })

@@ -8,6 +8,7 @@ create('abyss', internalPortBase + 5)
 create('void', internalPortBase + 6)
 create('editor', internalPortBase + 7)
 create('testing', internalPortBase + 8)
+create('mg:survival', internalPortBase + 9)
 
 process.on('exit', function(code){
   return console.log(`[main] Exiting with code ${code}`);

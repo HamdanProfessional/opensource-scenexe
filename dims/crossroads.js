@@ -508,9 +508,9 @@
             }
           })
         }
-        setTimeout(a, 30000 + 10000 * Math.random())
+        dim.after(a, 30000 + 10000 * Math.random())
       }
-      setTimeout(a, 10000 * Math.random())
+      dim.after(a, 10000 * Math.random())
     }
     generator.wormhole({
       static: true,
@@ -556,9 +556,9 @@
       let e = (Math.random() < 0.5 ? 1 : 0)
       let l = generated[2 + e], h = (10 + 20 * Math.random())
       createAbyssling(e)
-      setTimeout(spawnTriangles, h * 60 * 1000)
+      dim.after(spawnTriangles, h * 60 * 1000)
     }
-    setTimeout(spawnTriangles, 5000)
+    dim.after(spawnTriangles, 5000)
 
     const createAbyssling = function(i) {
       let _tx = generated[3 - i][0] * 300, _ty = generated[3 - i][1] * 300

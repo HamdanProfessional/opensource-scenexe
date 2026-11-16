@@ -1,4 +1,7 @@
       drawGate: function (gate) {
+        if(!render.inFOV({ x: gate.x, y: gate.y, size: gate.length + 200 })) {
+          return
+        }
         ctx.lineJoin = ctx.lineCap = "round";
         ctx.lineWidth = render.lineWidth;
         let transform = ctx.getTransform();
