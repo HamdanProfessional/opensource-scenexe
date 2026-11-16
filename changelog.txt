@@ -1,0 +1,18 @@
+BETA 1.0.0 - November 16, 2026
+- New Tank Editor gamemode: build your own tank and see every change live
+--Edit barrels, body, shape and auras, start from any tank, share designs as code
+- Weapon tree (Y) and body tree (U) show every upgrade path
+- Quick chat wheel: press T in game, click or press 1-9 to send
+--Edit your messages with the ... buttons, add new ones with +
+- New main menu layout with a smoother gamemode selector
+--Switching gamemodes now slides the selector and pans the background
+- New death screen: you stay in the game and spectate your killer
+--Shows your score, level, time alive and kills, with Respawn and Menu buttons
+- Smoother movement: updates are now up to 25 per second
+--Nearby tanks, bullets and shapes update faster, far away ones slower
+- Network compression lowers bandwidth by about half
+- Logins are remembered between visits, with a new login form
+- Debug mode (M) now has 3 levels: IDs and hitboxes, names, and health
+- Static camera is now on by default (toggle with H)
+- Redesigned How To Play and other popups
+- Team defenders always show on the minimap

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- Open-Scenexe favicon: a Split-Wall tank on a crosshair disc -->
+  <defs><clipPath id="disc"><circle cx="64" cy="64" r="61"/></clipPath></defs>
+  <circle cx="64" cy="64" r="61" fill="#cccccc"/>
+  <g clip-path="url(#disc)" stroke="#b5b5b5" stroke-width="5"><path d="M64 0V128M0 64H128"/></g>
+  <circle cx="64" cy="64" r="61" fill="none" stroke="#b5b5b5" stroke-width="5"/>
+  <g fill="#999999" stroke="#7f7f7f" stroke-width="5" stroke-linejoin="round">
+    <rect x="-8.25" y="-49.50" width="16.50" height="49.50" rx="1.5" transform="translate(51 51) rotate(170.01)"/>
+    <rect x="-8.25" y="-49.50" width="16.50" height="49.50" rx="1.5" transform="translate(51 51) rotate(99.99)"/>
+    <rect x="-16.50" y="-66.00" width="33.00" height="66.00" rx="1.5" transform="translate(51 51) rotate(135.00)"/>
+  </g>
+  <polygon points="59.54,82.88 27.67,74.33 19.12,42.46 42.46,19.12 74.33,27.67 82.88,59.54" fill="#00a5d4" stroke="#0090c2" stroke-width="5" stroke-linejoin="round"/>
+</svg>

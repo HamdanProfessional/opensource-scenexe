@@ -1,0 +1,13 @@
+node_modules/
+runtime/
+dist/
+*.bundle.js
+.DS_Store
+*.log
+.env
+accounts.json
+commandlogs.txt
+command-data.txt
+arras/import/.cache/
+anticheat-log.txt
+Scenexe.zip

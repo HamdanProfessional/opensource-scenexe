@@ -1,0 +1,17 @@
+{
+  "debug": 1,
+  "obfuscate": 0,
+  "port": 22443,
+  "internalPortBase": 9030,
+  "network": {
+    "sendRate": 25,
+    "nearTanks": 25,
+    "farTanks": 12.5,
+    "offscreenTanks": 2.5,
+    "nearBullets": 25,
+    "farBullets": 12.5,
+    "nearPolygons": 12.5,
+    "farPolygons": 5,
+    "nearDistance": 0.55
+  }
+}
