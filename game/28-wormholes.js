@@ -66,6 +66,7 @@
                 time: 60 + 120 * Math.random(),
                 dim: dim,
                 action: function(tank) {
+                  if(!(tank.ws && tank.ws.data && tank.ws.data.isPlayer)) { return }
                   let _b = tank.dim.bodies[tank.body] || {}
                   if(tank.team !== 6 && !_b.celestial) {
                     tank.ascend()

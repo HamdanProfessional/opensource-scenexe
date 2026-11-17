@@ -91,6 +91,7 @@
           freeJoin: options.freeJoin ? true : false,
           fillWalls: options.fillWalls ? true : false,
           noMinimap: options.noMinimap ? true : false,
+          wrap: options.wrap ? true : false,
           displayName: options.displayName || '',
           displayColor: options.displayColor || 0,
           displayRadiant: options.displayRadiant || 0,

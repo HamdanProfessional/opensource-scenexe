@@ -434,6 +434,7 @@
           tank.countUpgrades()
           tank.weapon = 'nova'
           tank.body = 'celestial'
+          tank.physics = ''
           if(tank.team !== 7) {
             tank.team = 6
           }

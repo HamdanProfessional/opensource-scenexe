@@ -26,7 +26,7 @@
     maxPolygonSides: 8,
     maxPolygonCount: 0,
     spawnPlayer: function (team, tank) {
-        if(tank.team != 6){
+        if(tank.team != 6 && tank.ws && tank.ws.data && tank.ws.data.isPlayer){
         tank.ascend();
         tank.ws.sendPacket("announcement", "Ascention complete.");
         }

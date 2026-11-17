@@ -2203,3 +2203,125 @@ button {
 .csBtn:hover {
   background: #3d3d3d;
 }
+#serversButton {
+  position: absolute;
+  top: calc(100% + 76px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 22px;
+  font-family: inherit;
+  font-size: 18px;
+  font-weight: 800;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.45);
+  border: 3px solid rgba(0, 0, 0, 0.75);
+  border-radius: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, 1px 1px 0 #000, -1px 1px 0 #000;
+}
+#serversButton:hover {
+  background: rgba(0, 0, 0, 0.6);
+}
+#serverBrowser {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 556px;
+  max-width: calc(100vw - 16px);
+  height: 640px;
+  max-height: calc(100vh - 16px);
+  padding: 16px 28px 20px;
+  background: rgba(50, 50, 50, 0.97);
+  border: 3px solid #000;
+  border-radius: 6px;
+  box-shadow: 0 0 0 3px #444;
+  color: #fff;
+  font-family: Roboto, Ubuntu, sans-serif;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.97);
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+#serverBrowser.open {
+  opacity: 1;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+}
+#sbTitle {
+  flex: none;
+  padding: 10px 0 12px;
+  border-bottom: 1px solid #ddd;
+  font-size: 30px;
+  font-weight: 900;
+  text-align: center;
+}
+#sbList {
+  flex: 1;
+  min-height: 0;
+  margin-top: 12px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #ddd transparent;
+}
+.sbRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+.sbRow.current .sbName {
+  color: #6fe39a;
+}
+.sbName {
+  font-size: 18px;
+  font-weight: 900;
+  word-break: break-word;
+}
+.sbInfo {
+  margin-top: 2px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+  word-break: break-all;
+}
+#sbCustom {
+  flex: none;
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+#sbAddress {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 15px;
+  color: #fff;
+  background: #161616;
+  border: none;
+  border-radius: 6px;
+  outline: none;
+}
+#sbNote {
+  flex: none;
+  min-height: 20px;
+  margin: 10px 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.75);
+  text-align: center;
+}
+#sbButtons {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid #ddd;
+}

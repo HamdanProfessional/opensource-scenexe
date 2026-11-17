@@ -2,7 +2,8 @@ let voidlings = 0;
 let firstVoidlings = 0;
 !function() {
   const dim = dimension.create({
-    mapSize: 50000,
+    mapSize: 15000,
+    wrap: true,
     displayName: 'Voidd',
     displayRadiant: 127,
     name: 'voidd',
@@ -49,12 +50,12 @@ let firstVoidlings = 0;
     },
     gridSize: 250,
     maxPolygonSides: 20,
-    maxPolygonCount: 2000,
+    maxPolygonCount: 200,
     spawnPlayer: function(team, tank) {
-      return [(2 * Math.random() - 1) * 49000, (2 * Math.random() - 1) * 49000]
+      return [(2 * Math.random() - 1) * 14500, (2 * Math.random() - 1) * 14500]
     },
     spawnPolygon: function(sides) {
-      return spawnOutsideRadius(49000, 18000000)
+      return spawnOutsideRadius(14500, 18000000)
     }
   })
   const createVoidling = function() {
@@ -62,8 +63,8 @@ let firstVoidlings = 0;
     firstVoidlings++
     let abyssling = generator.tank({
       dim: dim,
-      x: (2 * Math.random() - 1) * 49000,
-      y: (2 * Math.random() - 1) * 49000,
+      x: (2 * Math.random() - 1) * 14500,
+      y: (2 * Math.random() - 1) * 14500,
       name: '[THE DARKNESS]',
       weapon: 'voidling',
       body: 'voidling',
@@ -135,12 +136,12 @@ let firstVoidlings = 0;
     return abyssling
   }
   dim.every(function() {
-    if (firstVoidlings < 50) {
+    if (firstVoidlings < 8) {
       createVoidling()
     }
   }, 600)
   dim.every(function() {
-    if (voidlings < 50) {
+    if (voidlings < 8) {
       createVoidling()
     }
   }, 60000)

@@ -176,6 +176,10 @@
       })()
     })()
     const netStamp = function(e, now) {
+      if(Math.abs(e.nx - e.ox) > 5000 || Math.abs(e.ny - e.oy) > 5000) {
+        e.ox = e.x = e.nx
+        e.oy = e.y = e.ny
+      }
       let gap = now - (e.lt || now)
       if(gap > 1000) { gap = 1000 }
       if(gap > 0) {

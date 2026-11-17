@@ -31,7 +31,9 @@
       for(let i=dim.tanks.length-1;i>=0;i--) {
         let tank = dim.tanks[i]
 
-        dimension.confine(tank, dim.mapSize - (tank.size < 2 * dimension.clipSize ? tank.size / 2 : tank.size - dimension.clipSize), (dim.mapSizeSpeed > 0) ? (dim.mapSize > dim._mapSize ? dim.mapSizeSpeed : -dim.mapSizeSpeed) : 0)
+        if(dim.wrap) {
+          dimension.wrap(tank, dim.mapSize)
+        } else dimension.confine(tank, dim.mapSize - (tank.size < 2 * dimension.clipSize ? tank.size / 2 : tank.size - dimension.clipSize), (dim.mapSizeSpeed > 0) ? (dim.mapSize > dim._mapSize ? dim.mapSizeSpeed : -dim.mapSizeSpeed) : 0)
         tank.prevInBase = tank.inBase
         tank.inBase = false
         let closestObject = false

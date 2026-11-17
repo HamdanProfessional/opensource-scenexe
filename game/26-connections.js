@@ -325,7 +325,7 @@
           } else if(type === 'upgradeBody') {
             if(ws.data.tank) {
               let body = data[1] || ''
-              let map = ws.data.tank.physics === 'arras' ? undefined : tankData.bodyUpgradeMap[ws.data.tank.body]
+              let map = String(ws.data.tank.body).startsWith('arras:') ? undefined : tankData.bodyUpgradeMap[ws.data.tank.body]
               if(ws.data.tank.overrideBodies) {
                 map = {
                   upgrades: [body],

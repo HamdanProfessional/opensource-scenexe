@@ -255,6 +255,18 @@
         object.yv = -Math.abs(object.yv * dimension.wallRestitution) - v
       }
     },
+    wrap: function(tank, range) {
+      let dx = tank.x < -range ? 2 * range : (tank.x > range ? -2 * range : 0)
+      let dy = tank.y < -range ? 2 * range : (tank.y > range ? -2 * range : 0)
+      if(!dx && !dy) { return }
+      tank.x += dx
+      tank.y += dy
+      for(let id in tank.bullets) {
+        tank.bullets[id].x += dx
+        tank.bullets[id].y += dy
+      }
+      if(tank.mousePosition) { tank.mousePosition = [tank.mousePosition[0] + dx, tank.mousePosition[1] + dy] }
+    },
     getRadiantMultiplier: function(radiant) {
       if(radiant <= 0) {
         return 1

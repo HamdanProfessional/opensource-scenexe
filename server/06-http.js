@@ -183,6 +183,24 @@ const app = function(req, res) {
           res.end('{}')
         }
         break;
+      case '/serverinfo':
+        res.writeHead(200, {'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*'});
+        res.end(JSON.stringify(serverList.info()));
+        break;
+      case '/servers':
+        if(attackmode) { return blank() }
+        serverList.list(String(req.headers.host || ''), params.direct === '1').then(function(list) {
+          res.writeHead(200, {'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*'});
+          res.end(JSON.stringify(list));
+        });
+        break;
+      case '/announce':
+        if(attackmode) { return blank() }
+        serverList.announce(ip, params).then(function(result) {
+          res.writeHead(200, {'Content-Type': 'application/json', 'Cache-Control': 'no-store'});
+          res.end(JSON.stringify(result));
+        });
+        break;
       case '/sitemap':
         if(attackmode) { return blank() }
         res.writeHead(200, {'Content-Type': 'text/plain'});

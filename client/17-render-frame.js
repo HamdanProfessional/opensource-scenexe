@@ -154,6 +154,11 @@
           cameraTargetX = t ? t.x : game.spectate[1]
           cameraTargetY = t ? t.y : game.spectate[2]
         }
+        if(Math.abs(cameraTargetX - cameraRx) > 5000 || Math.abs(cameraTargetY - cameraRy) > 5000) {
+          cameraRx = cameraTargetX
+          cameraRy = cameraTargetY
+          cameraXv = cameraYv = 0
+        }
         if(render.staticCamera) {
           cameraRx = cameraTargetX
           cameraRy = cameraTargetY
