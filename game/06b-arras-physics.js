@@ -30,7 +30,7 @@
       targetReachLimit: 1.6,
       movementScale: 0.833,
       damageScale: { bullet: 1.143, swarm: 1.143, drone: 1.4, minion: 1.4, trap: 0.816, boomerang: 0.816 },
-      penetrationScale: { bullet: 0.6, swarm: 0.6, drone: 0.6, minion: 0.6, trap: 1, boomerang: 1 },
+      penetrationScale: { bullet: 0.6, swarm: 0.6, drone: 0.6, minion: 0.6, trap: 0.3, boomerang: 1 },
       speedDamageCap: 2,
       speedSkillBase: 1.5,
       speedSkillGain: 1.5,
@@ -242,7 +242,6 @@
       }
       if(data.arras.goToTarget) {
         let point = turret ? turret.aimPoint : tank.mousePosition
-        if(data.arras.reverseTarget && point) { point = [2 * tank.x - point[0], 2 * tank.y - point[1]] }
         arrasPhysics.aimAtTarget(bullet, point)
       }
     },

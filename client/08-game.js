@@ -64,7 +64,7 @@
             let a = document.createElement("canvas")
             a.width = a.height = game.splash.grid.size;
             let b = a.getContext("2d");
-            b.strokeStyle = render.rgb(game.splash.grid.lines);
+            b.strokeStyle = render.rgb(render.gridLines(game.splash.grid.lines));
             b.lineWidth = render.lineWidth;
             b.beginPath();
             b.moveTo(0, 0);

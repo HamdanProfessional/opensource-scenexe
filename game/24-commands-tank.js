@@ -152,7 +152,7 @@
             }
           }
           if(count && !(targets.length === 1 && targets[0] === tank)) {
-            ws.sendPacket('announcement', `Sent ${count} tank${count > 1 ? 's' : ''} to ${dim}.`)
+            ws.sendPacket('announcement', `Sent ${count} tank${count > 1 ? 's' : ''} to ${commands.dimLabel(dim)}.`)
           }
         }]
       ],

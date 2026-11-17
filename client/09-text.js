@@ -78,6 +78,8 @@
         return d
       },
       filter: true,
+      filled: {},
+      filledCount: 0,
       drawText: function(text, x, y, size, r, color) {
         let data = this.get(text, 'bold')
         if(r) {
@@ -94,7 +96,15 @@
           render.imageCount ++
           let c = data.canvas
           if(color && color.r + color.g + color.b < 750) {
-            c = this.fill(data, color)
+            let key = text + '|' + (color.r >> 3) + ',' + (color.g >> 3) + ',' + (color.b >> 3)
+            c = this.filled[key]
+            if(!c) {
+              if(++this.filledCount > 400) {
+                this.filled = {}
+                this.filledCount = 0
+              }
+              c = this.filled[key] = this.fill(data, color)
+            }
           }
           ctx.drawImage(c, x - data.width * full / 2, y - height + data.descent, data.width * full, height)
         }

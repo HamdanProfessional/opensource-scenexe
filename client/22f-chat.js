@@ -1,6 +1,6 @@
     !function() {
       const FONT = '800 50px Roboto', MAX_SHOWN = 48, MAX_ROWS = 7
-      let DIMS = ['ffa', '2teams', '4teams', 'crossroads', 'sanctuary', 'abyss', 'voidd', 'editor', 'mg:survival']
+      let DIMS = ['ffa', '2teams', '4teams', 'crossroads', 'sanctuary', 'abyss', 'void', 'editor', 'mg:survival']
       const SELECTORS = ['me', 'all', 'tanks', 'polygons', 'bullets', 'others', 'fallens', 'celestials', 'blues', 'reds', 'greens', 'purples', 'yellows', 'lasttank']
       const TEAMS = ['blue', 'red', 'green', 'purple', 'yellow', 'pink', 'ffa', 'fallen', 'black', 'random']
       const ROLES = ['player', 'mod', 'admin', 'owner']

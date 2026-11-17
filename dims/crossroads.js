@@ -570,7 +570,6 @@
         y: generated[i + 2][1] * 300,
         weapon: 'abyssling',
         body: 'abyssling',
-        forceDeathScore: 20e6,
         score: 1e9,
         radiant: 1,
         team: 8,

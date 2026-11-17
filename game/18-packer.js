@@ -171,6 +171,9 @@
     }
   }
   const packer = {
+    staff: function(tank) {
+      return tank.ws && tank.ws.data && tank.ws.data.isPlayer && commands.level(tank.ws.data.role) >= commands.level('admin') ? 1 : 0
+    },
     gameStart: function(options) {
       options.tank.net = false
       let dim = options.dim
@@ -185,7 +188,8 @@
           tank.weapon,
           tank.body,
           tank.ws ? (tank.ws.accountNameParsed || false) : false,
-          Math.round(tank.maxHealth) || 0
+          Math.round(tank.maxHealth) || 0,
+          packer.staff(tank)
         ])
       }
       let objects = dimension.leaderboard(dim)
@@ -409,7 +413,8 @@
             tank.weapon,
             tank.body,
             tank.ws ? (tank.ws ? tank.ws.accountNameParsed || false : false) : false,
-            Math.round(tank.maxHealth) || 0
+            Math.round(tank.maxHealth) || 0,
+            packer.staff(tank)
           ]
           data.push(arr)
         }

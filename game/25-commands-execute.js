@@ -39,7 +39,7 @@
       fling:           ['admin',  'Tank',       '/fling <target> <x> <y>',         'Pushes tanks by this velocity.', 1],
       setvelocity:     ['admin',  'Tank',       '/setvelocity <target> <x> <y>',   'Sets tanks\' velocity.', 1],
       drag:            ['admin',  'Tank',       '/drag [target]',                  'Targets follow your mouse. /drag alone stops.'],
-      send:            ['admin',  'Tank',       '/send [target] <dimension>',      'Sends tanks to another dimension, e.g. /send me voidd.'],
+      send:            ['admin',  'Tank',       '/send [target] <dimension>',      'Sends tanks to another dimension, e.g. /send me void.'],
 
       bot:             ['admin',  'World',      '/bot <x y | target> <name>',      'Spawns an AI tank.'],
       polygon:         ['admin',  'World',      '/polygon <sides> [count] [x y]',  'Spawns polygons.'],
@@ -81,16 +81,22 @@
       tank.dim.updatedTanks[tank.id] = tank
       if(tank.update) { tank.update() }
     },
-    dimNames: function() {
+    dimLabel: function(name) {
+      return String(name).replace(/^voidd/, 'void')
+    },
+    internalDims: function() {
       let all = (dimension.allDims || []).slice()
       for(let n in dimension.dims) { if(all.indexOf(n) < 0) { all.push(n) } }
       return all
     },
+    dimNames: function() {
+      return commands.internalDims().map(commands.dimLabel)
+    },
     findDim: function(name) {
-      let all = commands.dimNames(), n = String(name || '').toLowerCase()
-      let exact = all.find(d => d.toLowerCase() === n)
+      let all = commands.internalDims(), n = String(name || '').toLowerCase()
+      let exact = all.find(d => commands.dimLabel(d).toLowerCase() === n || d.toLowerCase() === n)
       if(exact) { return exact }
-      let starts = all.filter(d => d.toLowerCase().startsWith(n)).sort((a, b) => a.length - b.length)
+      let starts = all.filter(d => commands.dimLabel(d).toLowerCase().startsWith(n)).sort((a, b) => a.length - b.length)
       return starts[0] || false
     },
     isSandbox: function(dim) {

@@ -22,6 +22,16 @@
       opacity: { tanks: 1, bullets: 1, polygons: 1, hud: 1 },
       drawAlpha: 1,
       showGrid: true,
+      customGrid: { on: false, hex: '#c8c8c8', r: 200, g: 200, b: 200, a: 1 },
+      gridLines: function(lines) {
+        const c = render.customGrid
+        if(!c.on) { return lines }
+        return {
+          r: lines.r + (c.r - lines.r) * c.a,
+          g: lines.g + (c.g - lines.g) * c.a,
+          b: lines.b + (c.b - lines.b) * c.a
+        }
+      },
       damageFlash: true,
       screenShake: true,
       extrapolate: true,

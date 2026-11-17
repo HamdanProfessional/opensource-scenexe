@@ -7,12 +7,17 @@
         debugSlide.style.opacity = v ? 1 : 0
       }
       render.customBackground = { on: false, hex: '#cdcdcd', r: 205, g: 205, b: 205, a: 1 }
-      const setBackgroundColor = function(hex) {
-        const c = render.customBackground
+      const setHexColor = function(c, hex) {
         c.hex = hex.toLowerCase()
         c.r = parseInt(hex.slice(1, 3), 16)
         c.g = parseInt(hex.slice(3, 5), 16)
         c.b = parseInt(hex.slice(5, 7), 16)
+      }
+      const refreshGrid = function() {
+        try {
+          gameData.grid.generate()
+          game.splash.grid.generate()
+        } catch(e) {}
       }
       const SECTIONS = [
         ['Graphics', [
@@ -24,8 +29,13 @@
         ]],
         ['Map Background', [
           ['bgCustom', 'Custom Map Background', 'check', () => render.customBackground.on, v => { render.customBackground.on = v }, false],
-          ['bgColor', 'Background Color', 'color', () => render.customBackground.hex, v => { setBackgroundColor(v) }, '#cdcdcd'],
+          ['bgColor', 'Background Color', 'color', () => render.customBackground.hex, v => { setHexColor(render.customBackground, v) }, '#cdcdcd'],
           ['bgAlpha', 'Background Color Opacity', 'range', () => Math.round(render.customBackground.a * 100), v => { render.customBackground.a = v / 100 }, 100, 0, 100, 5]
+        ]],
+        ['Map Grid', [
+          ['gridCustom', 'Custom Grid Color', 'check', () => render.customGrid.on, v => { render.customGrid.on = v; refreshGrid() }, false],
+          ['gridColor', 'Grid Color', 'color', () => render.customGrid.hex, v => { setHexColor(render.customGrid, v); refreshGrid() }, '#c8c8c8'],
+          ['gridAlpha', 'Grid Color Opacity', 'range', () => Math.round(render.customGrid.a * 100), v => { render.customGrid.a = v / 100; refreshGrid() }, 100, 0, 100, 5]
         ]],
         ['Opacity', [
           ['opTanks', 'Tanks', 'range', () => Math.round(render.opacity.tanks * 100), v => { render.opacity.tanks = v / 100 }, 100, 10, 100, 5],

@@ -20,7 +20,7 @@
           let a = document.createElement("canvas")
           a.width = a.height = gameData.grid.size;
           let b = a.getContext("2d");
-          b.strokeStyle = render.rgb(gameData.grid.lines);
+          b.strokeStyle = render.rgb(render.gridLines(gameData.grid.lines));
           b.lineWidth = render.lineWidth;
           b.beginPath();
           b.moveTo(0, 0);
@@ -394,6 +394,7 @@
           let arr = gameTankData[id]
           tank.name = arr.name
           tank.accountName = arr.accountName
+          tank.staff = arr.staff
           tank.maxHealth = arr.maxHealth
           let s = true
           if(tank.radiant !== arr.radiant || tank.team !== arr.team) {

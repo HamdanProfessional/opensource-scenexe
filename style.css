@@ -1325,46 +1325,82 @@ button {
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, 130px);
+  transform: translate(-50%, 151px);
   display: flex;
-  gap: 16px;
+  gap: 12px;
+  width: 412px;
+  max-width: calc(100vw - 32px);
 }
 #menuButtons .menuBtn {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 26px;
-  padding: 10px 26px;
+  padding: 10px 12px;
 }
 #discordButton {
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, 214px);
+  transform: translate(calc(-100% - 6px), 225px);
+  box-sizing: border-box;
+  width: calc(min(412px, 100vw - 32px) / 2 - 6px);
+  padding: 8px 0;
   font-size: 24px;
-  padding: 8px 30px;
+  text-align: center;
+  white-space: nowrap;
   background: #5865f2;
 }
 #discordButton:hover {
-  transform: translate(-50%, 211px);
+  transform: translate(calc(-100% - 6px), 222px);
   filter: brightness(1.12);
 }
 #discordButton:active {
-  transform: translate(-50%, 218px);
+  transform: translate(calc(-100% - 6px), 229px);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.5), inset 0 3px 0 rgba(255, 255, 255, 0.15);
+}
+#serversButton {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(6px, 225px);
+  box-sizing: border-box;
+  width: calc(min(412px, 100vw - 32px) / 2 - 6px);
+  padding: 8px 0;
+  font-size: 24px;
+  text-align: center;
+  white-space: nowrap;
+  background: #2fa65a;
+}
+#serversButton:hover {
+  transform: translate(6px, 222px);
+  filter: brightness(1.15);
+}
+#serversButton:active {
+  transform: translate(6px, 229px);
   box-shadow: 0 2px 0 rgba(0, 0, 0, 0.5), inset 0 3px 0 rgba(255, 255, 255, 0.15);
 }
 #githubButton {
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, 272px);
+  transform: translate(-50%, 293px);
+  box-sizing: border-box;
+  width: 412px;
+  max-width: calc(100vw - 32px);
   font-size: 20px;
-  padding: 6px 24px;
+  padding: 6px 0;
+  text-align: center;
   background: #24292f;
 }
 #githubButton:hover {
-  transform: translate(-50%, 269px);
+  transform: translate(-50%, 290px);
   filter: brightness(1.25);
 }
 #githubButton:active {
-  transform: translate(-50%, 276px);
+  transform: translate(-50%, 297px);
   box-shadow: 0 2px 0 rgba(0, 0, 0, 0.5), inset 0 3px 0 rgba(255, 255, 255, 0.15);
 }
 #serverSelectTitle {
@@ -1517,6 +1553,9 @@ button {
   top: calc(100% + 16px);
   left: 50%;
   transform: translateX(-50%);
+  box-sizing: border-box;
+  width: 412px;
+  max-width: calc(100vw - 32px);
   display: flex;
   padding: 4px;
   gap: 4px;
@@ -1525,6 +1564,7 @@ button {
   border: 3px solid rgba(0, 0, 0, 0.75);
 }
 .tankModeOption {
+  flex: 1;
   padding: 6px 16px;
   font-family: inherit;
   font-size: 18px;
@@ -2202,26 +2242,6 @@ button {
 }
 .csBtn:hover {
   background: #3d3d3d;
-}
-#serversButton {
-  position: absolute;
-  top: calc(100% + 76px);
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 6px 22px;
-  font-family: inherit;
-  font-size: 18px;
-  font-weight: 800;
-  color: #fff;
-  background: rgba(0, 0, 0, 0.45);
-  border: 3px solid rgba(0, 0, 0, 0.75);
-  border-radius: 12px;
-  cursor: pointer;
-  white-space: nowrap;
-  text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, 1px 1px 0 #000, -1px 1px 0 #000;
-}
-#serversButton:hover {
-  background: rgba(0, 0, 0, 0.6);
 }
 #serverBrowser {
   position: fixed;

@@ -269,6 +269,10 @@
           let q = q1 < q2 ? q1 : q2
           if(q < (render.showUpgrades ? 450 : 10) && mouseY - render.height/2 > -200) { showUpgrades = true }
           render.showUpgrades = showUpgrades
+          if(!!gameData.me.staff !== page.state.tankNameStaff) {
+            page.state.tankNameStaff = !!gameData.me.staff
+            tankName.classList.toggle('radiantColor', page.state.tankNameStaff)
+          }
           if(gameData.me.name !== page.state.tankName) {
             tankName.textContent = gameData.me.name
             page.state.tankName = gameData.me.name
@@ -564,7 +568,7 @@
           text.drawText("lv. "+tank.level, tank.x, tank.y - tank.size - y * cameraSize, 30, cameraSize)
           y += 30
           if(tank.name) {
-            text.drawText(tank.name, tank.x, tank.y - tank.size - y * cameraSize, 50, cameraSize)
+            text.drawText(tank.name, tank.x, tank.y - tank.size - y * cameraSize, 50, cameraSize, tank.staff ? render.radiantColor : undefined)
             y += 50
           }
         }

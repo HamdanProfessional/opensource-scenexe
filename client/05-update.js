@@ -60,6 +60,7 @@
           arr.body = tank[5]
           arr.accountName = tank[6] || false
           arr.maxHealth = tank[7] || 0
+          arr.staff = tank[8] ? true : false
         }
         return updated
       }, chatMessages: function(chatMessages) {

@@ -4,7 +4,7 @@ let firstVoidlings = 0;
   const dim = dimension.create({
     mapSize: 15000,
     wrap: true,
-    displayName: 'Voidd',
+    displayName: 'Void',
     displayRadiant: 127,
     name: 'voidd',
     exitMessage: '[SERVER]: Error resolved...',
@@ -50,7 +50,7 @@ let firstVoidlings = 0;
     },
     gridSize: 250,
     maxPolygonSides: 20,
-    maxPolygonCount: 200,
+    maxPolygonCount: 500,
     spawnPlayer: function(team, tank) {
       return [(2 * Math.random() - 1) * 14500, (2 * Math.random() - 1) * 14500]
     },
@@ -68,13 +68,30 @@ let firstVoidlings = 0;
       name: '[THE DARKNESS]',
       weapon: 'voidling',
       body: 'voidling',
-      forceDeathScore: 2e9,
       score: 1e12,
       radiant: Math.random() < 0.2 ? (Math.random() < 0.2 ? 3 : 2) : 1,
       team: 8,
       invincible: false,
       onDeath: function() {
         voidlings--
+        let amount = Math.random() < 0.7 ? 4 : 5
+        for(let i=0;i<amount;i++) {
+          let sides = -1
+          while(sides > -5 && Math.random() < 0.35) {
+            sides --
+          }
+          let p = generator.polygon({
+            x: abyssling.x,
+            y: abyssling.y,
+            d: 2 * Math.PI * Math.random(),
+            sides: sides,
+            dim: dim,
+            radiant: abyssling.radiant + (Math.random() < 0.3 ? 1 : 0)
+          })
+          let r = Math.random() * 2 * Math.PI
+          p.xv = 60 * Math.cos(r) * dimension.per50
+          p.yv = 60 * Math.sin(r) * dimension.per50
+        }
       },
       ai: function(options) {
         let target = [0, 0]
@@ -167,7 +184,7 @@ let firstVoidlings = 0;
 !function() {
   const dim = dimension.create({
     mapSize: 5000,
-    displayName: 'Voidd Maze',
+    displayName: 'Void Maze',
     displayRadiant: 127,
     name: 'voiddMaze',
     entryMessage: '[SERVER]: An unexpected error occured...',

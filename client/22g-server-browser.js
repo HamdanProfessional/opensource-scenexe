@@ -1,8 +1,9 @@
     !function() {
       const button = document.createElement('button')
       button.id = 'serversButton'
+      button.className = 'menuBtn'
       button.textContent = 'Servers'
-      playMenu.appendChild(button)
+      githubButton.after(button)
 
       const root = document.createElement('div')
       root.id = 'serverBrowser'

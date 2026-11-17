@@ -1,6 +1,6 @@
 # Open-Scenexe
 
-A free, open source tank game that runs in the browser. Shoot shapes and other players, level up, and build your tank by upgrading your weapon and your body on separate paths. It has Free For All, 2 Teams, 4 Teams, deeper dimensions reached through portals (Crossroads, Sanctuary, Abyss, Voidd), a Survival minigame, a Tank Editor and a Testing Range. You can also play with a separate set of Arras tanks.
+A free, open source tank game that runs in the browser. Shoot shapes and other players, level up, and build your tank by upgrading your weapon and your body on separate paths. It has Free For All, 2 Teams, 4 Teams, deeper dimensions reached through portals (Crossroads, Sanctuary, Abyss, Void), a Survival minigame, a Tank Editor and a Testing Range. You can also play with a separate set of Arras tanks.
 
 Play on the official server: http://144.91.117.163:22440/
 

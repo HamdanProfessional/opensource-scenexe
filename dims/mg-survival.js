@@ -7,8 +7,8 @@
   const COUNTDOWN_MS = 5000
   const SPAWN_GAP_MS = 400
   const ENEMIES = {
-    thorn: { name: 'Beta Thorn', weapon: 'trapper', body: 'thorn', level: 30 },
-    saw: { name: 'Alpha Saw', weapon: 'node', body: 'saw', level: 45 }
+    thorn: { name: 'Beta Thorn', weapon: 'beta', body: 'thorn', level: 30 },
+    saw: { name: 'Alpha Saw', weapon: 'alpha', body: 'saw', level: 45 }
   }
 
   const scoreForLevel = function(level) {
