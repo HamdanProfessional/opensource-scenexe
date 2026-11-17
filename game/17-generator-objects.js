@@ -338,5 +338,73 @@
       }
       return wormhole
     },
+    bossIds: function() {
+      return Object.keys(tankData.bodies).filter(k => tankData.bodies[k].boss && tankData.weapons[k])
+    },
+    findBoss: function(name) {
+      let ids = generator.bossIds(), n = String(name || 'random').toLowerCase().replace(/^boss:/, '')
+      if(n === 'random') { return generator.randomBoss(ids) }
+      if(ids.indexOf('boss:' + n) >= 0) { return 'boss:' + n }
+      let family = ids.filter(k => tankData.bodies[k].boss.family === n)
+      if(family.length) { return family[Math.floor(Math.random() * family.length)] }
+      let named = ids.filter(k => tankData.bodies[k].boss.name.toLowerCase().replace(/ /g, '') === n)
+      return named[0] || false
+    },
+    randomBoss: function(ids) {
+      ids = ids || generator.bossIds()
+      let weights = [5, 4, 3, 2, 1], total = 0
+      for(let id of ids) { total += weights[tankData.bodies[id].boss.rank] }
+      let r = Math.random() * total
+      for(let id of ids) {
+        r -= weights[tankData.bodies[id].boss.rank]
+        if(r < 0) { return id }
+      }
+      return ids[0] || false
+    },
+    boss: function(dim, id, x, y) {
+      let info = tankData.bodies[id].boss
+      let boss = generator.tank({
+        dim: dim,
+        x: x,
+        y: y,
+        name: info.name,
+        weapon: id,
+        body: id,
+        score: info.score,
+        radiant: 0,
+        team: 8,
+        invincible: false,
+        ai: function() {
+          let target = false, best = 2500 * 2500
+          for(let i=dim.tanks.length-1;i>=0;i--) {
+            let t = dim.tanks[i]
+            if(t === boss || t.team === boss.team || t.static || !t.alive) { continue }
+            let dx = t.x - boss.x, dy = t.y - boss.y
+            let d = dx * dx + dy * dy
+            if(d < best) {
+              best = d
+              target = t
+            }
+          }
+          let hx = boss.x - x, hy = boss.y - y
+          let home = hx * hx + hy * hy > 3000 * 3000
+          let gx = target && !home ? target.x : x
+          let gy = target && !home ? target.y : y
+          let dx = gx - boss.x, dy = gy - boss.y
+          let dist = Math.sqrt(dx * dx + dy * dy)
+          if(target) {
+            boss.d = dimension.averageAngles(boss.d, Math.atan2(-(target.x - boss.x), target.y - boss.y), dimension.smooth(2))
+          }
+          boss.firing = target ? true : false
+          if(dist > (target && !home ? 500 : 150)) {
+            boss.input.movement = [dx / dist, dy / dist]
+          } else {
+            boss.input.movement = [0, 0]
+          }
+        }
+      })
+      boss.boss = true
+      return boss
+    },
   }
 

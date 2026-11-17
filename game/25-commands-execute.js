@@ -42,6 +42,8 @@
       send:            ['admin',  'Tank',       '/send [target] <dimension>',      'Sends tanks to another dimension, e.g. /send me void.'],
 
       bot:             ['admin',  'World',      '/bot <x y | target> <name>',      'Spawns an AI tank.'],
+      boss:            ['admin',  'World',      '/boss [boss] [x y | target]',     'Spawns a boss at your mouse: a boss like frost2, a family like frost, or random.'],
+      becomeboss:      ['admin',  'Tank',       '/becomeboss [target] <boss>',     'Turns into a boss, e.g. /becomeboss frost2 or /becomeboss magma.', 1],
       polygon:         ['admin',  'World',      '/polygon <sides> [count] [x y]',  'Spawns polygons.'],
       polyhedra:       ['admin',  'World',      '/polyhedra <1-5> [count] [x y]',  'Spawns polyhedra.'],
       darkness:        ['admin',  'World',      '/darkness <amount>',              'Sets this dimension\'s darkness.'],
@@ -74,6 +76,25 @@
       '?': 'help', commands: 'help', list: 'help', cmds: 'help',
       ann: 'announce', gann: 'globalannounce', invincible: 'god', invisible: 'vanish',
       score: 'xp', teleport: 'tp', tank: 'weapon', dim: 'send', dimension: 'send', travel: 'send'
+    },
+    spawnBoss: function(tank, ws, name, position) {
+      let id = generator.findBoss(name)
+      if(!id) { return ws.sendPacket('announcement', `There is no boss called '${name}'.`) }
+      position = position || [tank.x, tank.y]
+      generator.boss(tank.dim, id, position[0], position[1])
+      ws.sendPacket('announcement', `Spawned ${tankData.bodies[id].boss.name} (${id.slice(5)}).`)
+    },
+    becomeBoss: function(targets, ws, name) {
+      let id = generator.findBoss(name)
+      if(!id || !(id in targets[0].dim.weapons) || !(id in targets[0].dim.bodies)) { return ws.sendPacket('announcement', `There is no boss called '${name}' here.`) }
+      for(let i=targets.length-1;i>=0;i--) {
+        let t = targets[i]
+        if(t.static || !t.alive || t.dim !== targets[0].dim) { continue }
+        generator.setTankWeapon(t, id)
+        generator.setTankBody(t, id)
+        t.dim.updatedTanks[t.id] = t
+      }
+      ws.sendPacket('announcement', `Now ${tankData.bodies[id].boss.name} (${id.slice(5)}).`)
     },
     setLevel: function(tank, level) {
       level = Math.max(1, Math.min(300, Math.floor(level)))

@@ -18,6 +18,11 @@
       flash: false,
       quality: 1,
       rq: 1,
+      autoRes: true,
+      autoScale: 1,
+      autoGood: 0,
+      bestFps: 0,
+      lastAutoCheck: 0,
       particles: 1,
       opacity: { tanks: 1, bullets: 1, polygons: 1, hud: 1 },
       drawAlpha: 1,
@@ -599,7 +604,7 @@
         document.documentElement.scrollTo(0, 0)
         render.lw = window.innerWidth
         render.lh = window.innerHeight
-        render.quality = render.rq * devicePixelRatio
+        render.quality = render.rq * (render.autoRes ? render.autoScale : 1) * Math.min(devicePixelRatio || 1, 2)
         render.width =
           gameCanvas.width =
           hudCanvas.width =

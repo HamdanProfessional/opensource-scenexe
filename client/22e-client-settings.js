@@ -22,6 +22,7 @@
       const SECTIONS = [
         ['Graphics', [
           ['resolution', 'Resolution', 'range', () => Math.round(render.rq * 100), v => { render.rq = v / 100; if(loaded) { render.resize() } }, 100, 40, 100, 5],
+          ['autoRes', 'Auto Resolution (lowers it when FPS drops)', 'check', () => render.autoRes, v => { render.autoRes = v; render.autoScale = 1; render.autoGood = 0; if(loaded) { render.resize() } }, true],
           ['particles', 'Particles', 'range', () => Math.round(render.particles * 100), v => { render.particles = v / 100 }, 100, 0, 200, 10],
           ['outline', 'Outline Thickness', 'range', () => Math.round(render.lineWidth * 20), v => { render.lineWidth = v / 20 }, 100, 20, 200, 10],
           ['grid', 'Show Grid', 'check', () => render.showGrid, v => { render.showGrid = v }, true],

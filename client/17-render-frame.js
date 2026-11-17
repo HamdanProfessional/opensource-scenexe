@@ -124,6 +124,28 @@
         let l = 0
         while(render.frames[l] < render.now) { l ++ }
         render.frames.splice(0, l)
+        if(render.now - render.lastAutoCheck > 1000) {
+          const fps = render.frames.length
+          const steady = !document.hidden && render.now - render.lastAutoCheck < 1500
+          render.lastAutoCheck = render.now
+          if(steady && fps > render.bestFps) { render.bestFps = fps }
+          if(steady && render.autoRes && render.bestFps >= 30) {
+            if(fps < render.bestFps * 0.75 && render.autoScale > 0.5) {
+              render.autoScale = Math.max(0.5, render.autoScale - 0.1)
+              render.autoGood = 0
+              render.resize()
+            } else if(fps >= render.bestFps * 0.92 && render.autoScale < 1) {
+              render.autoGood ++
+              if(render.autoGood >= 5) {
+                render.autoGood = 0
+                render.autoScale = Math.min(1, render.autoScale + 0.1)
+                render.resize()
+              }
+            } else {
+              render.autoGood = 0
+            }
+          }
+        }
         l = 0
         while(game.packetSizes[l] && game.packetSizes[l][0] < render.now) { l ++ }
         game.packetSizes.splice(0, l)
@@ -186,6 +208,9 @@
         let gx = 0, gy = 0
         if(gameData.me && !overriding) {
           let weapon = gameData.me.weapon
+          if(page.pendingWeapon && weapon === page.lastWeapon && render.now - page.weaponUpgradeTimer < 1000 && page.pendingWeapon in tankData.weaponUpgradeMap) {
+            weapon = page.pendingWeapon
+          }
           if(tankData.overrideWeapons) {
             weapon = '@@override'
           }
@@ -371,7 +396,6 @@
         renderCtx.darknessCanvas.setTransform(render.defaultTransform)
         let w = render.width * cameraSize * 0.5
         let h = render.height * cameraSize * 0.5
-        ctx.clearRect(-w, -h, w * 2, h * 2)
         let w0 = w / cameraSize
         let h0 = h / cameraSize
         renderCtx.hudCanvas.clearRect(-w0, -h0, w0 * 2, h0 * 2)
@@ -419,6 +443,12 @@
         let lengthWalls = data.walls.length, lengthGates = data.gates.length
         let lengthTanks = data.tanks.length, lengthBullets = data.bullets.length, lengthPolygons = data.polygons.length
         ctx.lineWidth = 5
+        render.wallView.minX = cameraX - w
+        render.wallView.maxX = cameraX + w
+        render.wallView.minY = cameraY - h
+        render.wallView.maxY = cameraY + h
+        render.wallView.fill = render.rgb(render.wallColor, render.wallOpacity)
+        render.wallView.style = ''
         for(let i=0;i<lengthWalls;i++) {
           render.drawWall(data.walls[i], i, data)
         }

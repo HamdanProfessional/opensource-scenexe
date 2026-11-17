@@ -91,13 +91,30 @@
                   }
                 }
               } else {
-                let ox = dx < 0 ? 25 : -25, oy = dy < 0 ? 25 : -25
-                let cx = dx + ox, cy = dy + oy
-                let d = cx * cx + cy * cy
-                if(d < object.size * object.size) {
-                  d = d < 1 ? object.size : object.size / Math.sqrt(d)
-                  object.x = wx - ox + cx * d
-                  object.y = wy - oy + cy * d
+                let sx = dx < 0 ? -1 : 1, sy = dy < 0 ? -1 : 1
+                let side = dim.matrixWalls[x + sx]
+                let alongX = side && side[y], alongY = m[y + sy]
+                if(alongX && !alongY) {
+                  if(Math.abs(dy) < 25 + object.size) {
+                    object.y = wy + sy * (25 + object.size)
+                    object.yv = sy * Math.abs(object.yv) * dimension.wallRestitution
+                  }
+                } else if(alongY && !alongX) {
+                  if(Math.abs(dx) < 25 + object.size) {
+                    object.x = wx + sx * (25 + object.size)
+                    object.xv = sx * Math.abs(object.xv) * dimension.wallRestitution
+                  }
+                } else if(!alongX) {
+                  let ox = dx < 0 ? 25 : -25, oy = dy < 0 ? 25 : -25
+                  let cx = dx + ox, cy = dy + oy
+                  let d = cx * cx + cy * cy
+                  if(d < object.size * object.size) {
+                    let len = d < 1 ? 1 : Math.sqrt(d)
+                    d = d < 1 ? object.size : object.size / len
+                    object.x = wx - ox + cx * d
+                    object.y = wy - oy + cy * d
+                    dimension.stopInto(object, cx / len, cy / len)
+                  }
                 }
               }
             }
@@ -154,6 +171,37 @@
         let r = obj.size / distance
         obj.x = data.cx + (obj.x - data.cx) * r
         obj.y = data.cy + (obj.y - data.cy) * r
+        dimension.stopInto(obj, data.dcx / distance, data.dcy / distance)
+      }
+    },
+    stopInto: function(obj, nx, ny) {
+      if(!(obj.xv === obj.xv && obj.yv === obj.yv)) { return }
+      let vn = obj.xv * nx + obj.yv * ny
+      if(vn < 0) {
+        vn *= 1 + dimension.wallRestitution
+        obj.xv -= vn * nx
+        obj.yv -= vn * ny
+      }
+    },
+    wallCorners: function(list) {
+      let covers = function(a, px, py) {
+        for(let i=0;i<list.length;i++) {
+          let b = list[i]
+          if(b === a || b.object.team !== a.object.team) { continue }
+          if(px > b.x - b.w && px < b.x + b.w && py > b.y - b.h && py < b.y + b.h) { return true }
+        }
+        return false
+      }
+      for(let i=0;i<list.length;i++) {
+        let a = list[i], corners = []
+        for(let k=0;k<4;k++) {
+          let sx = (k & 1) ? 1 : -1, sy = (k & 2) ? 1 : -1
+          let px = a.x + sx * a.w, py = a.y + sy * a.h
+          let alongX = covers(a, px + sx, py - sy)
+          let alongY = covers(a, px - sx, py + sy)
+          corners.push(alongX && alongY ? 3 : alongX ? 1 : alongY ? 2 : 0)
+        }
+        a.corners = corners.some(c => c) ? corners : null
       }
     },
     bounceGate: function(b, c, e) {

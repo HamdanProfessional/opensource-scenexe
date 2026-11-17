@@ -75,3 +75,20 @@ const spawnCenterPolygon = function(dim, delay) {
     })
   }, delay || 5000)
 }
+
+const spawnCenterBosses = function(dim) {
+  if(!generator.bossIds().length) { return }
+  let boss = false, nextTime = Date.now() + 60000 * (1 + Math.random())
+  let check = function() {
+    if(boss && boss.alive) {
+      nextTime = Date.now() + 60000 * (3 + 4 * Math.random())
+    } else if(Date.now() >= nextTime) {
+      let id = generator.randomBoss()
+      boss = generator.boss(dim, id, 0, 0)
+      dim.broadcast(`${tankData.bodies[id].boss.name} has appeared in the center!`)
+      nextTime = Date.now() + 60000 * (3 + 4 * Math.random())
+    }
+    dim.after(check, 10000)
+  }
+  dim.after(check, 10000)
+}

@@ -227,11 +227,14 @@
       },
       wallCount: 0,
       wallType: 0,
+      wallView: { minX: 0, maxX: 0, minY: 0, maxY: 0, fill: '', style: '' },
       drawWall: function(wall, id, data) {
-        if(wall && render.inFOV(wall)) {
+        let v = render.wallView
+        if(wall && wall.x - wall.w < v.maxX && wall.x + wall.w > v.minX && wall.y - wall.h < v.maxY && wall.y + wall.h > v.minY) {
           render.wallCount ++
           if(data.wallType === 1 && !wall.color) {
             render.setFillStroke({ r:166, g:167, b:174 })
+            v.style = ''
             ctx.beginPath()
             ctx.rect(wall.x - wall.w + 2.5, wall.y - wall.h + 2.5, wall.w * 2 - 5, wall.h * 2 - 5)
             ctx.fill()
@@ -241,10 +244,16 @@
             ctx.stroke()
             ctx.closePath()
           } else {
+            let style = v.fill
             if(wall.color) {
-              ctx.fillStyle = render.rgb(wall.color, 0.25)
-            } else {
-              ctx.fillStyle = render.rgb(render.wallColor, render.wallOpacity)
+              if(wall.fillColor !== wall.color) {
+                wall.fillColor = wall.color
+                wall.fillStyle = render.rgb(wall.color, 0.25)
+              }
+              style = wall.fillStyle
+            }
+            if(style !== v.style) {
+              ctx.fillStyle = v.style = style
             }
             ctx.fillRect(wall.x - wall.w, wall.y - wall.h, wall.w * 2, wall.h * 2)
           }
@@ -261,6 +270,7 @@
             ctx.globalAlpha = render.hudOpacity * render.opacity.hud
             render.debugId(String(id), wall.x, wall.y, Math.max(Math.min(wall.w, wall.h) * 0.6, 15 * cameraSize), render.lighten(wall.color || render.wallColor, 120), a)
             ctx.globalAlpha = 1
+            v.style = ''
           }
         }
       },
@@ -270,6 +280,7 @@
         let sides = b
         b = tankData.bodies[b]
         if(b && !(b >= 0)) { sides = b.sides }
+        if(b && b.color) { return b.color }
         if(team === 5) {
           if(sides >= 3) {
             return render.getPolygonColor(sides)

@@ -112,6 +112,22 @@
           data.hitSide = true
           return data
         } else {
+          if(rect.corners) {
+            let mode = rect.corners[(circle.x < rect.x ? 0 : 1) + (circle.y < rect.y ? 0 : 2)]
+            if(mode) {
+              data.hitSide = true
+              if(mode === 1) {
+                data.colliding = data.inX && data.inY
+                data.cinX = true
+              } else if(mode === 2) {
+                data.colliding = data.inX && data.inY
+                data.cinY = true
+              } else {
+                data.colliding = false
+              }
+              return data
+            }
+          }
           data.cx = circle.x < rect.x ? rect.left + r : rect.right - r
           data.cy = circle.y < rect.y ? rect.bottom + r : rect.top - r
           data.dcx = circle.x - data.cx

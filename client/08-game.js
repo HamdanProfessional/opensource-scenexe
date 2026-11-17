@@ -230,10 +230,8 @@
         }
         if(!weapon) {
           weapon = tankData.weapons.node
-          tank.weapon = 'node'
         } if(!body) {
           body = tankData.bodies.base
-          tank.body = 'base'
         }
         const part = function(n, def) { return n && n[0] ? (n[0] === '@' ? (def && def.name) || 'Custom' : n[0].toUpperCase() + n.slice(1)) : '???' }
         let upgrade = `${part(tank.weapon, tankData.weapons[tank.weapon])}-${part(tank.body, tankData.bodies[tank.body])}`
@@ -377,7 +375,7 @@
         if(tank === gameData.me && tank.team === 0) {
           tank.color = render.teamColors[1]
         } else {
-          tank.color = render.getTankColor(tank.team, tank.sides)
+          tank.color = body.color || render.getTankColor(tank.team, tank.sides)
         }
       },
       connectTo: function(ws, key) {

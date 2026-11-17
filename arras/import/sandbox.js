@@ -11,7 +11,7 @@ const SUPPORT_FILES = [
   'presets.js'
 ]
 
-const loadOsa = function(cacheDir, loadOrder) {
+const loadOsa = function(cacheDir, loadOrder, configOverrides) {
   const base = path.join(cacheDir, DEFINITIONS)
   const placeholders = new Map()
   const classTable = {}
@@ -32,7 +32,8 @@ const loadOsa = function(cacheDir, loadOrder) {
     skill_cap: 9,
     tier_multiplier: 15,
     glass_health_factor: 2,
-    level_cap: 45
+    level_cap: 45,
+    ...configOverrides
   }, {
     get(target, key) { return target[key] }
   })
@@ -86,7 +87,7 @@ const loadOsa = function(cacheDir, loadOrder) {
     try {
       runModule(name)
     } catch(err) {
-      failures.push({ file: rel, error: String(err && err.message || err) })
+      failures.push({ file: rel, error: String(err && err.message || err), at: String(err && err.stack || '').split('\n')[1] || '' })
     }
   }
 

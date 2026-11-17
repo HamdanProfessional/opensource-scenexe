@@ -481,7 +481,9 @@
       currentWeaponUpgrades: false,
       weaponUpgradeTimer: 0,
       lastWeapon: '',
+      pendingWeapon: '',
       createWeaponUpgrades: function(weapons, label) {
+        let quick = performance.now() - page.weaponUpgradeTimer < 1000
         if(page.currentWeaponUpgrades) {
           page.currentWeaponUpgrades.remove()
         }
@@ -518,13 +520,18 @@
               gameSend(gameCurrentServer.ws, ['upgradeWeapon', weapon])
               page.weaponUpgradeTimer = performance.now()
               page.lastWeapon = gameData.me.weapon
+              page.pendingWeapon = weapon
             }
             upgrades.remove()
           })
         }
-        setTimeout(function() {
+        if(quick) {
           upgrades.div.style.left = '10px'
-        }, 100)
+        } else {
+          setTimeout(function() {
+            upgrades.div.style.left = '10px'
+          }, 100)
+        }
         overlay1.appendChild(upgrades.div)
         page.upgradeList.push(upgrades)
       },

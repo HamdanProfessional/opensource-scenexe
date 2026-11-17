@@ -10,7 +10,7 @@
     let renderHideNames = false
 
     let renderCtx = {
-      gameCanvas: gameCanvas.getContext("2d"),
+      gameCanvas: gameCanvas.getContext("2d", { alpha: false }),
       darknessCanvas: darknessCanvas.getContext("2d"),
       hudCanvas: hudCanvas.getContext("2d"),
       mapCanvas: mapCanvas.getContext("2d"),

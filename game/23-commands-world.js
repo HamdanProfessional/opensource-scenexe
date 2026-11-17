@@ -1,3 +1,22 @@
+      boss: [
+        [[], function(data, tank, ws) {
+          commands.spawnBoss(tank, ws, 'random', tank.mousePosition)
+        }],
+        [['string'], function(data, tank, ws) {
+          commands.spawnBoss(tank, ws, data[0], tank.mousePosition)
+        }],
+        [['string', 'position'], function(data, tank, ws) {
+          commands.spawnBoss(tank, ws, data[0], data[1])
+        }]
+      ],
+      becomeboss: [
+        [['string'], function(data, tank, ws) {
+          commands.becomeBoss([tank], ws, data[0])
+        }],
+        [['targets', 'string'], function(data, tank, ws) {
+          commands.becomeBoss(data[0], ws, data[1])
+        }]
+      ],
       polygon: [
         [['int'], function(data, tank, ws) {
           let sides = data[0]

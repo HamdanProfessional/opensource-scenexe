@@ -46,9 +46,9 @@ const cacheDirFor = function(sha) {
   return path.join(CACHE_ROOT, sha)
 }
 
-const fetchAll = async function(source, sha) {
+const fetchAll = async function(source, sha, extraFiles) {
   const dir = cacheDirFor(sha)
-  for(const rel of filesFor(source)) {
+  for(const rel of filesFor(source).concat(extraFiles || [])) {
     const target = path.join(dir, rel)
     if(fs.existsSync(target)) { continue }
     const body = await download('/' + SOURCES[source].repo + '/' + sha + '/' + rel)

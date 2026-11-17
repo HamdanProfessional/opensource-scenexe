@@ -211,6 +211,7 @@
         }
       }
       dim.frozenPolygons = frozenCount
+      let wallList = [], wallSig = 0, wallNew = false
       for(let i=dim.walls.length-1;i>=0;i--) {
         let wall = dim.walls[i]
         if(!wall) { continue }
@@ -224,6 +225,7 @@
         if(!object) {
           object = { type: 'wall', rectangular: true, object: {} }
           wallCollideObjects.set(wall, object)
+          wallNew = true
         }
         object.x = wall[0]
         object.y = wall[1]
@@ -232,6 +234,13 @@
         object.object.team = wall[4] || -1
         object.noInvincibility = wall[5] ? wall[5].noInvincibility : false
         objects.push(object)
+        wallList.push(object)
+        wallSig = (wallSig * 31 + wall[0] * 3 + wall[1] * 5 + wall[2] * 7 + wall[3] * 11 + object.object.team) % 1000000007
+      }
+      wallSig = wallSig * 1000 + wallList.length
+      if(wallNew || wallSig !== dim.wallCornerSig) {
+        dim.wallCornerSig = wallSig
+        dimension.wallCorners(wallList)
       }
       for(let i=dim.gates.length-1;i>=0;i--) {
         let gate = dim.gates[i], w, h
