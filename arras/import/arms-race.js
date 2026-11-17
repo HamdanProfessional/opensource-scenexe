@@ -1,13 +1,16 @@
 const fs = require('fs')
 const path = require('path')
-const { SOURCES, DEFAULT_SOURCE, loadOrderFor, cacheDirFor, fetchAll } = require('./fetch.js')
+const { SOURCES, loadOrderFor, cacheDirFor, fetchAll } = require('./fetch.js')
 const { loadOsa } = require('./sandbox.js')
 const { makeConverter } = require('./convert.js')
 
 const ROOT = path.join(__dirname, '..', '..')
 const TANK_DATA = path.join(ROOT, 'tankData')
-const ADDON = 'groups/armsRaceTanks.js'
-const ADDON_FILE = 'server/lib/definitions/entityAddons/armsRace/tanks.js'
+const SOURCE = 'open-source-arras'
+const DEFS = 'server/lib/definitions/'
+const EXTRA_GROUPS = ['groups/food.js']
+const EXTRA_TANKS = ['special', 'retrograde', 'armsRace', 'nostalgia', 'scrapped', 'menus'].map(function(f) { return 'groups/tanks/' + f + '.js' })
+const ARMS_RACE = 'groups/tanks/armsRace.js'
 const LEVEL_PER_TIER = 10
 
 const loadTankData = function() {
@@ -25,13 +28,16 @@ const writeEntries = function(file, target, entries) {
 
 const run = async function() {
   const offline = process.argv.includes('--offline')
-  const source = DEFAULT_SOURCE
-  const sha = SOURCES[source].sha
-  const cacheDir = offline ? cacheDirFor(sha) : await fetchAll(source, sha, [ADDON_FILE])
-  const defs = path.join(cacheDir, 'server', 'lib', 'definitions')
-  const addonText = fs.readFileSync(path.join(cacheDir, ADDON_FILE), 'utf8').split('\n').filter(function(line) { return !/menu_unused/.test(line) }).join('\n')
-  fs.writeFileSync(path.join(defs, ADDON), addonText)
-  const osa = loadOsa(cacheDir, loadOrderFor(source).concat([ADDON]), { arms_race: true, level_cap: 120, level_cap_cheat: 120 })
+  const sha = SOURCES[SOURCE].sha
+  const extra = EXTRA_GROUPS.concat(EXTRA_TANKS).map(function(f) { return DEFS + f })
+  const cacheDir = offline ? cacheDirFor(sha) : await fetchAll(SOURCE, sha, extra)
+  const armsRaceFile = path.join(cacheDir, DEFS, ARMS_RACE)
+  const armsRaceText = fs.readFileSync(armsRaceFile, 'utf8')
+  fs.writeFileSync(armsRaceFile, armsRaceText.replace('const free_tier_4 = true', 'const free_tier_4 = false'))
+  const base = loadOrderFor(SOURCE)
+  const order = base.slice(0, 3).concat(EXTRA_GROUPS, base.slice(3, 4), EXTRA_TANKS, base.slice(4))
+  const osa = loadOsa(cacheDir, order, { arms_race: true, level_cap: 120, level_cap_cheat: 120 }, true)
+  fs.writeFileSync(armsRaceFile, armsRaceText)
   const report = {}
   const converter = makeConverter(osa.classTable, report)
 

@@ -31,6 +31,7 @@ const RENAMES = {
   overlord: 'Sovereign',
   overseer: 'Warden',
   overtrapper: 'Warlock',
+  megaTrapper: 'Bulkhead',
   pentaShot: 'Quintet',
   predator: 'Ambusher',
   ranger: 'Pathfinder',

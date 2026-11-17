@@ -1,5 +1,5 @@
     !function() {
-      const BOX = 96, GAP = 12, ROW = 150
+      const BOX = 96, GAP = 12, ROW = 150, PER_LINE = 30
       const root = document.createElement('div')
       root.id = 'upgradeTree'
       root.innerHTML = `<canvas id="utCanvas"></canvas>`
@@ -11,7 +11,8 @@
 
       const build = function(k) {
         const map = tankData[k === 'weapon' ? 'weaponUpgradeMap' : 'bodyUpgradeMap']
-        const start = k === 'weapon' ? 'node' : 'base'
+        const arras = gameData.me && String(gameData.me.weapon).startsWith('arras:')
+        const start = k === 'weapon' ? (arras ? 'arras:basic' : 'node') : 'base'
         const row = { [start]: 0 }
         for(let changed=true, guard=0;changed && guard<50;guard++) {
           changed = false
@@ -31,7 +32,7 @@
           if(e) { for(const c of e.upgrades) { (parents[c] = parents[c] || []).push(name) } }
         }
         const nodes = {}
-        let width = 0
+        let width = 0, y = 0
         for(let r=0;r<rows.length;r++) {
           const list = rows[r] || []
           if(r > 0) {
@@ -43,10 +44,14 @@
           } else {
             list.sort()
           }
-          const w = list.length * BOX + (list.length - 1) * GAP
-          width = Math.max(width, w)
-          for(let i=0;i<list.length;i++) {
-            nodes[list[i]] = { name: list[i], row: r, x: -w / 2 + i * (BOX + GAP) + BOX / 2, y: r * ROW, level: map[list[i]] ? map[list[i]].level : null }
+          for(let start=0;start<list.length;start+=PER_LINE) {
+            const line = list.slice(start, start + PER_LINE)
+            const w = line.length * BOX + (line.length - 1) * GAP
+            width = Math.max(width, w)
+            for(let i=0;i<line.length;i++) {
+              nodes[line[i]] = { name: line[i], row: r, x: -w / 2 + i * (BOX + GAP) + BOX / 2, y: y, level: map[line[i]] ? map[line[i]].level : null }
+            }
+            y += start + PER_LINE < list.length ? BOX + GAP : ROW
           }
         }
         const edges = []
@@ -54,7 +59,7 @@
           const e = map[name]
           if(e) { for(const c of e.upgrades) { if(nodes[c]) { edges.push([nodes[name], nodes[c]]) } } }
         }
-        return { kind: k, map: map, nodes: nodes, edges: edges, width: width, height: (rows.length - 1) * ROW + BOX }
+        return { kind: k, map: map, nodes: nodes, edges: edges, width: width, height: y - ROW + BOX }
       }
 
       const icon = function(name) {

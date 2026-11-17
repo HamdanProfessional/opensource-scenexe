@@ -34,5 +34,4 @@
     defenders[team].push(createDefender(dim, [-5200, 5200, 5200, -5200][i], [-5200, -5200, 5200, 5200][i], team, TEAM_NAMES[team] + ' Defender'))
   }
   spawnCenterPolygon(dim)
-  spawnCenterBosses(dim)
 }()

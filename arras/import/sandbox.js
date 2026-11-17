@@ -11,7 +11,7 @@ const SUPPORT_FILES = [
   'presets.js'
 ]
 
-const loadOsa = function(cacheDir, loadOrder, configOverrides) {
+const loadOsa = function(cacheDir, loadOrder, configOverrides, strict) {
   const base = path.join(cacheDir, DEFINITIONS)
   const placeholders = new Map()
   const classTable = {}
@@ -21,7 +21,7 @@ const loadOsa = function(cacheDir, loadOrder, configOverrides) {
     get(target, key) {
       if(typeof key !== 'string') { return target[key] }
       if(key in target) { return target[key] }
-      if(key === 'toJSON' || key === 'then') { return undefined }
+      if(key === 'toJSON' || key === 'then' || strict) { return undefined }
       if(!placeholders.has(key)) { placeholders.set(key, { PLACEHOLDER: true, NAME: key }) }
       return placeholders.get(key)
     }
@@ -87,7 +87,7 @@ const loadOsa = function(cacheDir, loadOrder, configOverrides) {
     try {
       runModule(name)
     } catch(err) {
-      failures.push({ file: rel, error: String(err && err.message || err), at: String(err && err.stack || '').split('\n')[1] || '' })
+      failures.push({ file: rel, error: String(err && err.message || err), at: String(err && err.stack || '').split('\n').slice(1, 5).join(' <- ') })
     }
   }
 
