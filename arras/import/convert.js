@@ -316,7 +316,12 @@ const makeConverter = function(classTable, report) {
         barrel.type = 10
         delete barrel.drones
       } else {
-        barrel.bulletWeapon = { barrels: convertGuns(projectile.GUNS || [], depth + 1), weaponTurrets: [] }
+        const minionGuns = convertGuns(projectile.GUNS || [], depth + 1)
+        for(const sub of minionGuns) {
+          const subRef = sub.arras && FAMILY_REFERENCE[sub.arras.family]
+          if(subRef) { sub.penetration = subRef.penetration }
+        }
+        barrel.bulletWeapon = { barrels: minionGuns, weaponTurrets: [] }
         barrel.bulletBody = makeBulletBody(0, [])
       }
     }

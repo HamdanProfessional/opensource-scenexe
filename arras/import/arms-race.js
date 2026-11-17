@@ -11,7 +11,131 @@ const DEFS = 'server/lib/definitions/'
 const EXTRA_GROUPS = ['groups/food.js']
 const EXTRA_TANKS = ['special', 'retrograde', 'armsRace', 'nostalgia', 'scrapped', 'menus'].map(function(f) { return 'groups/tanks/' + f + '.js' })
 const ARMS_RACE = 'groups/tanks/armsRace.js'
+const BETTER_ARMS_RACE = 'entityAddons/betterArmsRace/tanks.js'
+const FORK = 'broken-arras'
+const FORK_ADDON = 'groups/armsRaceTanks.js'
+const FORK_ADDON_FILE = 'server/lib/definitions/entityAddons/armsRace/tanks.js'
 const LEVEL_PER_TIER = 10
+
+const loadFork = function(offline) {
+  const sha = SOURCES[FORK].sha
+  const cacheDir = cacheDirFor(sha)
+  const text = fs.readFileSync(path.join(cacheDir, FORK_ADDON_FILE), 'utf8').split('\n').filter(function(line) { return !/menu_unused/.test(line) }).join('\n')
+  fs.writeFileSync(path.join(cacheDir, DEFS, FORK_ADDON), text)
+  return loadOsa(cacheDir, loadOrderFor(FORK).concat([FORK_ADDON]), { arms_race: true, level_cap: 120, level_cap_cheat: 120 })
+}
+
+const forkName = function(name) {
+  return name.replace(/^PLACEHOLDER_/, '').replace(/_AR$/, '')
+}
+
+const addForkTanks = function(table, forkTable) {
+  const lower = {}
+  for(const name of Object.keys(table)) { lower[name.toLowerCase()] = name }
+  const target = function(name) {
+    const short = forkName(name)
+    return lower[short.toLowerCase()] || short
+  }
+  let added = 0, links = 0
+  for(const name of Object.keys(forkTable)) {
+    const def = forkTable[name]
+    if(!def || typeof def !== 'object' || def.PLACEHOLDER) { continue }
+    if(!(name in table)) { table[name] = def }
+    const short = target(name)
+    if(!(short in table)) { table[short] = def; lower[short.toLowerCase()] = short; added++ }
+  }
+  for(const name of Object.keys(forkTable)) {
+    const def = forkTable[name]
+    if(!def || typeof def !== 'object' || def.PLACEHOLDER) { continue }
+    const own = table[target(name)]
+    if(!own) { continue }
+    for(let tier = 0; tier <= 9; tier++) {
+      const list = def['UPGRADES_TIER_' + tier]
+      if(!Array.isArray(list)) { continue }
+      const mine = (Array.isArray(own['UPGRADES_TIER_' + tier]) ? own['UPGRADES_TIER_' + tier] : []).map(function(e) { return typeof e === 'string' && table[target(e)] ? target(e) : e }).filter(function(e, i, a) { return a.indexOf(e) === i })
+      for(const entry of list) {
+        if(typeof entry !== 'string') { continue }
+        const t = target(entry)
+        if(!table[t] || mine.includes(t) || t === target(name)) { continue }
+        mine.push(t)
+        links++
+      }
+      own['UPGRADES_TIER_' + tier] = mine
+    }
+  }
+  return { added, links }
+}
+
+const gunPosition = function(position) {
+  let p = position
+  if(Array.isArray(p)) { p = { LENGTH: p[0], WIDTH: p[1], ASPECT: p[2], X: p[3], Y: p[4], ANGLE: p[5], DELAY: p[6] } }
+  p = p || {}
+  return {
+    L: p.LENGTH === undefined ? 18 : p.LENGTH,
+    W: p.WIDTH === undefined ? 8 : p.WIDTH,
+    A: p.ASPECT === undefined ? 1 : p.ASPECT,
+    X: p.X || 0,
+    Y: p.Y || 0,
+    ANGLE: p.ANGLE || 0
+  }
+}
+
+const completeGuns = function(table) {
+  const converter = makeConverter(table, {})
+  const templateOf = function(name, pick) {
+    const guns = converter.resolve(name).GUNS || []
+    const gun = guns.filter(function(g) { return g.PROPERTIES && g.PROPERTIES.SHOOT_SETTINGS }).find(pick || function() { return true })
+    return gun && gun.PROPERTIES
+  }
+  const templates = {
+    basic: templateOf('basic'),
+    sniper: templateOf('sniper'),
+    machine: templateOf('machineGun'),
+    trap: templateOf('trapper'),
+    drone: templateOf('overseer')
+  }
+  const fires = function(def, depth) {
+    if(!def || depth > 6) { return false }
+    if((def.GUNS || []).some(function(g) { return g.PROPERTIES && g.PROPERTIES.SHOOT_SETTINGS })) { return true }
+    return (def.TURRETS || []).some(function(t) {
+      const type = Array.isArray(t.TYPE) ? t.TYPE[0] : t.TYPE
+      return fires(typeof type === 'string' ? converter.resolve(type) : type, depth + 1)
+    })
+  }
+  const done = []
+  for(const name of converter.reachableFrom('basic')) {
+    const resolved = converter.resolve(name)
+    const placeholder = resolved.UPGRADE_COLOR === 'black' || resolved.UPGRADE_COLOR === 'pureBlack'
+    if(fires(resolved, 0) && !placeholder) { continue }
+    const guns = resolved.GUNS || []
+    const pos = guns.map(function(g) { return gunPosition(g.POSITION) })
+    const role = pos.map(function(p) {
+      if(p.W < 4 || p.L < 2 || p.A < 0) { return null }
+      if(p.A >= 1.25 && p.L <= 6) { return 'trap' }
+      if(p.A >= 1.05 && p.A < 1.6 && p.L <= 10 && p.W >= 7) { return 'drone' }
+      if(p.L >= 22) { return 'sniper' }
+      if(p.A >= 1.25) { return 'machine' }
+      return 'basic'
+    })
+    pos.forEach(function(p, i) {
+      if(role[i] !== 'trap') { return }
+      pos.forEach(function(q, j) {
+        if(j !== i && role[j] && role[j] !== 'trap' && q.ANGLE === p.ANGLE && Math.abs(q.Y - p.Y) < 1 && Math.abs(q.X + q.L - p.X) <= 2) { role[j] = null }
+      })
+    })
+    if(!role.some(Boolean)) { continue }
+    const own = table[name]
+    own.GUNS = guns.map(function(g, i) {
+      if(g.PROPERTIES && g.PROPERTIES.SHOOT_SETTINGS) { return g }
+      if(!role[i] || !templates[role[i]]) { return g }
+      return Object.assign({}, g, { PROPERTIES: templates[role[i]] })
+    })
+    own.UPGRADE_COLOR = undefined
+    own.UPGRADE_TOOLTIP = undefined
+    done.push(name)
+  }
+  return done
+}
 
 const loadTankData = function() {
   return require(path.join(TANK_DATA, 'index.js')).load()
@@ -29,15 +153,18 @@ const writeEntries = function(file, target, entries) {
 const run = async function() {
   const offline = process.argv.includes('--offline')
   const sha = SOURCES[SOURCE].sha
-  const extra = EXTRA_GROUPS.concat(EXTRA_TANKS).map(function(f) { return DEFS + f })
+  const extra = EXTRA_GROUPS.concat(EXTRA_TANKS, [BETTER_ARMS_RACE]).map(function(f) { return DEFS + f })
   const cacheDir = offline ? cacheDirFor(sha) : await fetchAll(SOURCE, sha, extra)
   const armsRaceFile = path.join(cacheDir, DEFS, ARMS_RACE)
   const armsRaceText = fs.readFileSync(armsRaceFile, 'utf8')
-  fs.writeFileSync(armsRaceFile, armsRaceText.replace('const free_tier_4 = true', 'const free_tier_4 = false'))
+  fs.writeFileSync(armsRaceFile, armsRaceText.replace('const free_tier_4 = true', 'const free_tier_4 = false').replace('const enable_missing_tanks = false', 'const enable_missing_tanks = true'))
   const base = loadOrderFor(SOURCE)
   const order = base.slice(0, 3).concat(EXTRA_GROUPS, base.slice(3, 4), EXTRA_TANKS, base.slice(4))
-  const osa = loadOsa(cacheDir, order, { arms_race: true, level_cap: 120, level_cap_cheat: 120 }, true)
+  const osa = loadOsa(cacheDir, order.concat([BETTER_ARMS_RACE]), { arms_race: true, level_cap: 120, level_cap_cheat: 120 }, true)
   fs.writeFileSync(armsRaceFile, armsRaceText)
+  const fork = loadFork(offline)
+  const forkReport = addForkTanks(osa.classTable, fork.classTable)
+  const completed = completeGuns(osa.classTable)
   const report = {}
   const converter = makeConverter(osa.classTable, report)
 
@@ -126,7 +253,9 @@ const run = async function() {
   writeEntries(path.join(TANK_DATA, 'bodies', '9-arras_race.js'), 'bodies', bodies)
   writeEntries(path.join(TANK_DATA, 'upgrades', 'arras_race.js'), 'weaponUpgradeMap', merged)
 
-  console.log('loader failures: ' + JSON.stringify(osa.failures))
+  console.log('loader failures: ' + JSON.stringify(osa.failures.concat(fork.failures)).slice(0, 800))
+  console.log('fork tanks added: ' + forkReport.added + ', fork links: ' + forkReport.links + ', completed guns: ' + completed.length)
+  console.log('completed: ' + completed.join(' '))
   console.log('reachable: ' + reachable.length + ', new tanks: ' + Object.keys(weapons).length + ', upgrade entries: ' + Object.keys(merged).length + ', new upgrade links: ' + added)
   console.log('dropped unfinished: ' + dropped.length + ', unreachable after drop: ' + (Object.keys(candidates).length - Object.keys(weapons).length - dropped.length))
   console.log('dropped: ' + dropped.map(function(k) { return k.slice('arras:'.length) }).join(' '))
