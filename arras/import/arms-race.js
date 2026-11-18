@@ -2,7 +2,7 @@ const fs = require('fs')
 const path = require('path')
 const { SOURCES, loadOrderFor, cacheDirFor, fetchAll } = require('./fetch.js')
 const { loadOsa } = require('./sandbox.js')
-const { makeConverter } = require('./convert.js')
+const { makeConverter, RENAMES } = require('./convert.js')
 
 const ROOT = path.join(__dirname, '..', '..')
 const TANK_DATA = path.join(ROOT, 'tankData')
@@ -20,9 +20,71 @@ const LEVEL_PER_TIER = 10
 const loadFork = function(offline) {
   const sha = SOURCES[FORK].sha
   const cacheDir = cacheDirFor(sha)
-  const text = fs.readFileSync(path.join(cacheDir, FORK_ADDON_FILE), 'utf8').split('\n').filter(function(line) { return !/menu_unused/.test(line) }).join('\n')
-  fs.writeFileSync(path.join(cacheDir, DEFS, FORK_ADDON), text)
+  const target = path.join(cacheDir, DEFS, FORK_ADDON)
+  if(!fs.existsSync(target)) {
+    const text = fs.readFileSync(path.join(cacheDir, FORK_ADDON_FILE), 'utf8').split('\n').filter(function(line) { return !/menu_unused/.test(line) }).join('\n')
+    fs.writeFileSync(target, text)
+  }
   return loadOsa(cacheDir, loadOrderFor(FORK).concat([FORK_ADDON]), { arms_race: true, level_cap: 120, level_cap_cheat: 120 })
+}
+
+const WIKI = path.join(__dirname, 'wiki')
+
+const escapeRegExp = function(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+const restoreCensorFlags = function(table, keys, flagged) {
+  const words = flagged.map(function(k) { return { label: String(table[k].LABEL || ''), rename: RENAMES[k] } }).filter(function(w) { return w.label }).sort(function(a, b) { return b.label.length - a.label.length })
+  for(const k of keys) {
+    const own = table[k]
+    if(!Object.prototype.hasOwnProperty.call(own, 'DMCA_CENSOR_NAME') || own.DMCA_CENSOR_NAME) { continue }
+    let label = String(own.LABEL || k)
+    for(const w of words) {
+      label = label.replace(new RegExp('(^|[^A-Za-z])' + escapeRegExp(w.label) + '(?![A-Za-z])', 'g'), function(m, lead) { return lead + w.rename })
+    }
+    own.DMCA_CENSOR_NAME = true
+    own.DMCA_CENSOR_DESIGN = true
+    RENAMES[k] = label
+  }
+}
+
+const loadWikiTanks = function(osa) {
+  const links = []
+  const loaded = []
+  const created = []
+  if(!fs.existsSync(WIKI)) { return { loaded, created, links: 0, missingLinks: [] } }
+  const flagged = Object.keys(osa.classTable).filter(function(k) { return osa.classTable[k].DMCA_CENSOR_NAME === true && RENAMES[k] })
+  const tiers = fs.readdirSync(WIKI).filter(function(d) { return /^tier\d+$/.test(d) }).sort(function(a, b) { return parseInt(a.slice(4)) - parseInt(b.slice(4)) })
+  for(const dir of tiers) {
+    const tier = parseInt(dir.slice(4))
+    const files = fs.readdirSync(path.join(WIKI, dir)).filter(function(f) { return f.endsWith('.js') }).sort().map(function(f) { return path.join(WIKI, dir, f) })
+    const upgrade = function(parents, child) {
+      for(const parent of [].concat(parents)) { links.push({ parent, child, tier }) }
+    }
+    for(const file of files) {
+      const before = Object.assign({}, osa.classTable)
+      const ok = osa.extend([file], { upgrade }).length
+      const replaced = Object.keys(before).filter(function(k) { return osa.classTable[k] !== before[k] })
+      for(const k of replaced) { osa.classTable[k] = before[k] }
+      if(replaced.length) { osa.failures.push({ file: path.basename(file), error: 'replaces existing class ' + replaced.join(', ') }) }
+      if(ok && !replaced.length) { loaded.push(path.basename(file, '.js')) }
+      for(const k of Object.keys(osa.classTable)) { if(!(k in before)) { created.push(k) } }
+    }
+  }
+  const table = osa.classTable
+  restoreCensorFlags(table, created, flagged)
+  const missingLinks = []
+  let added = 0
+  for(const link of links) {
+    const own = table[link.parent]
+    if(!own || !table[link.child]) { missingLinks.push(link.parent + ' -> ' + link.child); continue }
+    const key = 'UPGRADES_TIER_' + (link.tier - 1)
+    const list = Array.isArray(own[key]) ? own[key].slice() : []
+    if(!list.includes(link.child)) { list.push(link.child); added++ }
+    own[key] = list
+  }
+  return { loaded, created, links: added, missingLinks }
 }
 
 const forkName = function(name) {
@@ -150,21 +212,27 @@ const writeEntries = function(file, target, entries) {
   fs.writeFileSync(file, text)
 }
 
-const run = async function() {
-  const offline = process.argv.includes('--offline')
+const loadAll = async function(offline) {
   const sha = SOURCES[SOURCE].sha
   const extra = EXTRA_GROUPS.concat(EXTRA_TANKS, [BETTER_ARMS_RACE]).map(function(f) { return DEFS + f })
   const cacheDir = offline ? cacheDirFor(sha) : await fetchAll(SOURCE, sha, extra)
-  const armsRaceFile = path.join(cacheDir, DEFS, ARMS_RACE)
-  const armsRaceText = fs.readFileSync(armsRaceFile, 'utf8')
-  fs.writeFileSync(armsRaceFile, armsRaceText.replace('const free_tier_4 = true', 'const free_tier_4 = false').replace('const enable_missing_tanks = false', 'const enable_missing_tanks = true'))
   const base = loadOrderFor(SOURCE)
   const order = base.slice(0, 3).concat(EXTRA_GROUPS, base.slice(3, 4), EXTRA_TANKS, base.slice(4))
-  const osa = loadOsa(cacheDir, order.concat([BETTER_ARMS_RACE]), { arms_race: true, level_cap: 120, level_cap_cheat: 120 }, true)
-  fs.writeFileSync(armsRaceFile, armsRaceText)
+  const transforms = {}
+  transforms[path.basename(ARMS_RACE)] = function(text) {
+    return text.replace('const free_tier_4 = true', 'const free_tier_4 = false').replace('const enable_missing_tanks = false', 'const enable_missing_tanks = true')
+  }
+  const osa = loadOsa(cacheDir, order.concat([BETTER_ARMS_RACE]), { arms_race: true, level_cap: 120, level_cap_cheat: 120 }, true, transforms)
   const fork = loadFork(offline)
   const forkReport = addForkTanks(osa.classTable, fork.classTable)
+  const wikiReport = loadWikiTanks(osa)
   const completed = completeGuns(osa.classTable)
+  return { osa, fork, forkReport, wikiReport, completed }
+}
+
+const run = async function() {
+  const offline = process.argv.includes('--offline')
+  const { osa, fork, forkReport, wikiReport, completed } = await loadAll(offline)
   const report = {}
   const converter = makeConverter(osa.classTable, report)
 
@@ -205,6 +273,7 @@ const run = async function() {
   const dropped = []
   const unfinished = function(key) {
     if(!candidates[key]) { return false }
+    if(wikiReport.created.includes(key.slice('arras:'.length))) { return false }
     const color = converter.resolve(key.slice('arras:'.length)).UPGRADE_COLOR
     if(color === 'black' || color === 'pureBlack') { return true }
     if(attacks(key)) { return false }
@@ -256,6 +325,7 @@ const run = async function() {
   console.log('loader failures: ' + JSON.stringify(osa.failures.concat(fork.failures)).slice(0, 800))
   console.log('fork tanks added: ' + forkReport.added + ', fork links: ' + forkReport.links + ', completed guns: ' + completed.length)
   console.log('completed: ' + completed.join(' '))
+  console.log('wiki tanks loaded: ' + wikiReport.loaded.length + ', wiki links: ' + wikiReport.links + (wikiReport.missingLinks.length ? ', missing links: ' + wikiReport.missingLinks.join(', ') : ''))
   console.log('reachable: ' + reachable.length + ', new tanks: ' + Object.keys(weapons).length + ', upgrade entries: ' + Object.keys(merged).length + ', new upgrade links: ' + added)
   console.log('dropped unfinished: ' + dropped.length + ', unreachable after drop: ' + (Object.keys(candidates).length - Object.keys(weapons).length - dropped.length))
   console.log('dropped: ' + dropped.map(function(k) { return k.slice('arras:'.length) }).join(' '))
@@ -264,7 +334,11 @@ const run = async function() {
   }
 }
 
-run().catch(function(err) {
-  console.error(err)
-  process.exit(1)
-})
+module.exports = { loadAll }
+
+if(require.main === module) {
+  run().catch(function(err) {
+    console.error(err)
+    process.exit(1)
+  })
+}

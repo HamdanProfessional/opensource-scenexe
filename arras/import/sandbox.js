@@ -11,7 +11,7 @@ const SUPPORT_FILES = [
   'presets.js'
 ]
 
-const loadOsa = function(cacheDir, loadOrder, configOverrides, strict) {
+const loadOsa = function(cacheDir, loadOrder, configOverrides, strict, transforms) {
   const base = path.join(cacheDir, DEFINITIONS)
   const placeholders = new Map()
   const classTable = {}
@@ -76,7 +76,8 @@ const loadOsa = function(cacheDir, loadOrder, configOverrides, strict) {
     const entry = sources[name]
     const module = { exports: {} }
     moduleCache[name] = module
-    const code = '(function(module, exports, require) {' + fs.readFileSync(entry.file, 'utf8') + '\n})'
+    const text = fs.readFileSync(entry.file, 'utf8')
+    const code = '(function(module, exports, require) {' + (transforms && transforms[name] ? transforms[name](text) : text) + '\n})'
     const fn = vm.runInContext(code, context, { filename: entry.rel })
     fn(module, module.exports, requireModule)
     return module.exports
@@ -91,7 +92,23 @@ const loadOsa = function(cacheDir, loadOrder, configOverrides, strict) {
     }
   }
 
-  return { Class, classTable, failures, placeholders }
+  const extend = function(files, globals) {
+    Object.assign(context, globals || {})
+    const done = []
+    for(const file of files) {
+      const name = 'wiki:' + path.relative(cacheDir, file).split(path.sep).join('/')
+      sources[name] = { rel: name, file }
+      try {
+        runModule(name)
+        done.push(file)
+      } catch(err) {
+        failures.push({ file: name, error: String(err && err.message || err), at: String(err && err.stack || '').split('\n').slice(1, 3).join(' <- ') })
+      }
+    }
+    return done
+  }
+
+  return { Class, classTable, failures, placeholders, extend }
 }
 
 module.exports = { loadOsa }

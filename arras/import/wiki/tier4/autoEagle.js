@@ -1,0 +1,1 @@
+upgrade(["autoTriAngle","eagle"], "autoEagle")

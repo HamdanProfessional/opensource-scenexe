@@ -484,6 +484,8 @@
       pendingWeapon: '',
       createWeaponUpgrades: function(weapons, label) {
         let quick = performance.now() - page.weaponUpgradeTimer < 1000
+        let columns = Math.max(3, Math.ceil(weapons.length / 4))
+        let hidden = `${-(110 + 140 * columns)}px`
         if(page.currentWeaponUpgrades) {
           page.currentWeaponUpgrades.remove()
         }
@@ -491,7 +493,7 @@
           div: document.createElement('div'),
           buttons: {},
           remove: function() {
-            upgrades.div.style.left = '-450px'
+            upgrades.div.style.left = hidden
             upgrades.div.style.pointerEvents = 'none'
             if(page.currentWeaponUpgrades === upgrades) {
               page.currentWeaponUpgrades = false
@@ -508,12 +510,13 @@
         }
         page.currentWeaponUpgrades = upgrades
         upgrades.div.className = 'weaponUpgrades'
+        upgrades.div.style.left = hidden
         for(let i=0,l=weapons.length;i<l;i++) {
           let weapon = weapons[i], w = tankData.weapons[weapon]
           let box = upgrades.buttons[weapon] = page.createUpgradeBox(weapon, w.renderBody || 'base', w.label || weapon)
-          box.box.style.left = `${70 + 140 * (i % 3)}px`
-          box.box.style.bottom = `${70 + 140 * Math.floor(i / 3)}px`
-          box.box.style.background = render.rgb(render.polygonColors[i])
+          box.box.style.left = `${70 + 140 * (i % columns)}px`
+          box.box.style.bottom = `${70 + 140 * Math.floor(i / columns)}px`
+          box.box.style.background = render.rgb(render.polygonColors[i % render.polygonColors.length])
           upgrades.div.appendChild(box.box)
           box.box.addEventListener('click', function() {
             if(gameData.me) {

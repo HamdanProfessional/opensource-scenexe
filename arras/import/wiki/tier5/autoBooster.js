@@ -1,0 +1,1 @@
+upgrade(["booster","autoTriAngle"], "autoBooster")

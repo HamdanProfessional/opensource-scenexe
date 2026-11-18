@@ -517,6 +517,7 @@
               bullet.sides = 4
               bullet.star = barrel.barrel.bulletStar || 0
             } else if(barrel.barrel.type === 2) {
+              if(barrel.barrel.bulletBody) { game.updateTank(bullet, barrel.barrel.bulletWeapon, barrel.barrel.bulletBody) }
               bullet.sides = barrel.barrel.bulletSides >= 0 ? barrel.barrel.bulletSides : 3
             } else if(barrel.barrel.type === 3 || barrel.barrel.type === 4 || barrel.barrel.bulletWeapon) {
               game.updateTank(bullet, barrel.barrel.bulletWeapon, barrel.barrel.bulletBody)

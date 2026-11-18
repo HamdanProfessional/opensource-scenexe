@@ -1,0 +1,1 @@
+upgrade(["fighter","integrator"], "pug")

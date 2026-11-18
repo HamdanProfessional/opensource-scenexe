@@ -345,6 +345,14 @@ const makeConverter = function(classTable, report) {
         if(family === 'trap') { barrel.type = 3 }
       }
     }
+    if((family === 'drone' || family === 'swarm' || family === 'minion') && depth < MAX_PROJECTILE_GUN_DEPTH && Array.isArray(projectile.TURRETS) && projectile.TURRETS.length) {
+      const riders = convertTurrets(projectile.TURRETS, {})
+      if(riders.length) {
+        if(!barrel.bulletWeapon) { barrel.bulletWeapon = { barrels: [], weaponTurrets: [] } }
+        const sides = typeof projectile.SHAPE === 'number' && projectile.SHAPE >= 3 ? projectile.SHAPE : family === 'minion' ? 0 : 3
+        barrel.bulletBody = barrel.bulletBody ? Object.assign({}, barrel.bulletBody, { turrets: barrel.bulletBody.turrets.concat(riders) }) : makeBulletBody(sides, riders)
+      }
+    }
     if(props.SHOOT_ON_DEATH) { barrel.shootOnDeath = true }
     if(props.AUTOFIRE) { barrel.autoFire = true }
     if(props.ALT_FIRE) { barrel.altFire = true }
