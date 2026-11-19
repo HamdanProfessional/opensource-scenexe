@@ -1,6 +1,32 @@
 let locked = false
 
 let uids = {}
+
+const attempts = {
+  data: {},
+  windowMs: 10 * 60 * 1000,
+  list: function(key) {
+    const now = Date.now()
+    const list = (attempts.data[key] || []).filter(function(t) { return t > now - attempts.windowMs })
+    if(list.length) { attempts.data[key] = list } else { delete attempts.data[key] }
+    return list
+  },
+  blocked: function(key, max) {
+    return attempts.list(key).length >= max
+  },
+  add: function(key) {
+    const list = attempts.list(key)
+    list.push(Date.now())
+    attempts.data[key] = list
+  },
+  clear: function(key) {
+    delete attempts.data[key]
+  }
+}
+
+setInterval(function() {
+  for(const key in attempts.data) { attempts.list(key) }
+}, 60000)
 const trafficMeter = function() {
   let sec = 0, count = 0, bytes = 0, lastCount = 0, lastBytes = 0
   const roll = function() {
@@ -157,6 +183,11 @@ server.on("connection", (ws, request) => {
         if(ws.account || ws.accountName) { return }
         console.log('attempt create username:', data[1][0])
         let u = data[1][0], p = data[1][1]
+        const createKey = 'create:' + ipGroup(ws._ip)
+        if(attempts.blocked(createKey, 3)) {
+          ws.sendPacket('flag', ['login', 0, 'Too many new accounts from your network, try again later'])
+          return
+        }
         if(typeof u === 'string' && words.isBad(u)) {
           discordBot.send('profanity', `Someone${discordBot.ip(ws)} tried to create an account named ||${discordBot.clean(u, 100)}||`)
           ws.sendPacket('flag', ['login', 0, 'That username isn\'t allowed'])
@@ -168,6 +199,7 @@ server.on("connection", (ws, request) => {
         }).then(function(d) {
           console.log(d)
           if(d.success) {
+            attempts.add(createKey)
             d.account.account.lastOnline = Math.floor(Date.now() / 1000)
             ws.sendPacket('flag', ['login', accountToObject(d.account.account)])
             console.log('Login', d.account.account.username)
@@ -283,11 +315,20 @@ server.on("connection", (ws, request) => {
           if(type === 'login') {
             if(!ws.data.ready) {
               console.log('attempt login username:', data[1][0])
+              const ipKey = 'login-ip:' + ipGroup(ws._ip)
+              const userKey = 'login-user:' + String(data[1][0]).toLowerCase()
+              if(attempts.blocked(ipKey, 6) || attempts.blocked(userKey, 10)) {
+                ws.sendPacket('flag', ['login', 0, 'Too many wrong passwords, try again in a few minutes'])
+                return
+              }
               ws.data.loginWaiting = true
-              Accounts.fromUsername(data[1][0]).then(function(a) {
+              Accounts.fromUsername(data[1][0]).then(async function(a) {
                 if(a.success) {
                   let username = Accounts.readUsername(a.account)
-                  if(a.account.password === SHA256(data[1][1])) {
+                  const result = await checkPassword(a.account, data[1][1])
+                  if(result.ok) {
+                    attempts.clear(ipKey)
+                    if(result.upgrade) { a.account.password = await hashPassword(data[1][1]) }
                     a.account.lastOnline = Math.floor(Date.now() / 1000)
                     ws.sendPacket('flag', ['login', accountToObject(a.account)])
                     console.log('Login', a.account.username)
@@ -297,9 +338,12 @@ server.on("connection", (ws, request) => {
                     a.save()
                     ws.data.admin = commandData.level(a.account.username) >= 2
                   } else {
+                    attempts.add(ipKey)
+                    attempts.add(userKey)
                     ws.sendPacket('flag', ['login', 0, 'Wrong password'])
                   }
                 } else {
+                  attempts.add(ipKey)
                   ws.sendPacket('flag', ['login', 0, 'Account not found'])
                 }
                 ws.data.loginWaiting = false

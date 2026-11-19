@@ -86,8 +86,8 @@ let limit = {
       }
     }
     if(lastSecond > 0) {
-      console.log('too many per second:', lastSecond, ip)
-      return true
+      if(debug) { console.log('too many per second:', lastSecond, ip) }
+      return end(1)
     }
     if(b.requests.length >= 10) {
       if(b.timeout <= now) {
@@ -119,70 +119,85 @@ let limit = {
   }
 }
 
-const getIp = function(req) {
-  let ip = (req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.socket.remoteAddress).split(',')[0].trim();
-  if(ip.startsWith('::ffff:')) {
-    ip = ip.replace('::ffff:', '')
-  }
+const net = require('net')
+
+const cleanIp = function(ip) {
+  ip = String(ip || '').trim()
+  if(ip.startsWith('::ffff:') && net.isIPv4(ip.slice(7))) { ip = ip.slice(7) }
   return ip
 }
 
-let attackmode = 0, lastTrigger = -60000, cleanInteractions = function() {
-  let cutoff = performance.now() - 1000
-  for(let i in interactions) {
-    let t = interactions[i]
-    if(t < cutoff) {
-      delete interactions[i]
-    }
+const proxyRanges = (function() {
+  const list = new net.BlockList()
+  const add = function(cidr) {
+    const [address, bits] = cidr.split('/')
+    const type = net.isIPv6(address) ? 'ipv6' : 'ipv4'
+    try { list.addSubnet(address, Number(bits), type) } catch(e) {}
   }
+  const local = ['127.0.0.0/8', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '::1/128', 'fc00::/7']
+  const cloudflare = [
+    '173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22', '141.101.64.0/18', '108.162.192.0/18',
+    '190.93.240.0/20', '188.114.96.0/20', '197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13',
+    '104.24.0.0/14', '172.64.0.0/13', '131.0.72.0/22',
+    '2400:cb00::/32', '2606:4700::/32', '2803:f800::/32', '2405:b500::/32', '2405:8100::/32', '2a06:98c0::/29', '2c0f:f248::/32'
+  ]
+  const extra = Array.isArray(config.trustedProxies) ? config.trustedProxies : []
+  for(const cidr of local.concat(cloudflare, extra)) { add(String(cidr).includes('/') ? String(cidr) : String(cidr) + (net.isIPv6(String(cidr)) ? '/128' : '/32')) }
+  return list
+})()
+
+const isTrustedProxy = function(ip) {
+  if(!net.isIP(ip)) { return false }
+  return proxyRanges.check(ip, net.isIPv6(ip) ? 'ipv6' : 'ipv4')
 }
 
-setInterval(cleanInteractions, 60000)
+const getIp = function(req) {
+  const peer = cleanIp(req.socket.remoteAddress)
+  if(!isTrustedProxy(peer)) { return peer }
+  const forwarded = cleanIp(String(req.headers['cf-connecting-ip'] || String(req.headers['x-forwarded-for'] || '').split(',')[0] || ''))
+  return net.isIP(forwarded) ? forwarded : peer
+}
+
+const ipGroup = function(ip) {
+  if(!net.isIPv6(ip)) { return ip }
+  const parts = ip.split('::')
+  const head = parts[0] ? parts[0].split(':') : []
+  const tail = parts.length > 1 && parts[1] ? parts[1].split(':') : []
+  const full = parts.length > 1 ? head.concat(new Array(8 - head.length - tail.length).fill('0'), tail) : head
+  return full.slice(0, 4).map(function(p) { return (parseInt(p, 16) || 0).toString(16) }).join(':') + '::/64'
+}
+
+let attackmode = 0, interactions = {}
+
+setInterval(function() {
+  const cutoff = performance.now() - 60000
+  for(const ip in interactions) {
+    const list = interactions[ip].filter(function(t) { return t >= cutoff })
+    if(list.length) { interactions[ip] = list } else { delete interactions[ip] }
+  }
+}, 60000)
 
 let filter = {
   requests: [],
-  add: function() {
-    let now = performance.now()
-    let arr = filter.requests
+  perIpLimit: 240,
+  add: function(ip) {
+    const now = performance.now()
+    const mine = interactions[ip] || (interactions[ip] = [])
+    mine.push(now)
+    while(mine.length && mine[0] < now - 60000) { mine.shift() }
+    if(mine.length > filter.perIpLimit && typeof anticheat !== 'undefined' && anticheat.ban(ip, 'flooding the website with ' + mine.length + ' requests a minute')) {
+      delete interactions[ip]
+    }
+    const arr = filter.requests
     arr.push(now)
-    let l = arr.length, i = 0
-    if(l > 300 && attackmode - now < 110000) {
-      setTimeout(function() {
-        console.log('Attack Mode', l)
-        discordBot.send('spam', `Attack mode on: ${l} connection requests in a short time`)
-        discordBot.send('gameStatus', 'Attack mode on, the server is getting flooded with connections')
-        attackmode = now + 120000
-        if(now - lastTrigger > 20000) {
-          lastTrigger = now
-          console.log('Cloudflare bans triggered')
-          cleanInteractions()
-          let ips = []
-          cloudflare.read()
-          for(let ip in interactions) {
-            let r = cloudflare.addSusIp(ip)
-            if(r > 0) {
-              console.log('Suspicious ip', ip, r)
-              if(r >= 3) {
-                console.log('Cloudflare ban', ip, r)
-                discordBot.send('spam', `Cloudflare ban for ${discordBot.code(ip)}`)
-                ips.push(ip)
-              }
-            }
-          }
-          cloudflare.write()
-          if(ips.length > 0) {
-            console.log('Cloudflare banning', ips)
-            cloudflare.addIps(ips)
-          }
-        }
-      }, 1000)
+    while(arr.length && arr[0] < now - 60000) { arr.shift() }
+    if(arr.length > 600 && attackmode <= now) {
+      attackmode = now + 120000
+      console.log('Attack Mode', arr.length)
+      discordBot.send('spam', `Attack mode on: ${arr.length} requests in a minute, connections now need harder proof of work`)
+      discordBot.send('gameStatus', 'Attack mode on, the server is getting flooded with connections')
+    } else if(arr.length > 600) {
+      attackmode = Math.max(attackmode, now + 30000)
     }
-    for(i=0;i<l;i++) {
-      if(arr[i] >= now - 60000) {
-        break
-      }
-    }
-    arr.splice(0, i)
   }
 }
-

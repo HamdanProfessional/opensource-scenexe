@@ -163,7 +163,66 @@
         }
         return b
       },
+      native: native && native.collide ? native : null,
+      _native: null,
+      detectNative: function(objects, callback, slices) {
+        const n = objects.length
+        let buf = Detector._native
+        if(!buf || buf.size < n) {
+          const size = Math.max(1024, n * 2)
+          buf = Detector._native = { size: size, geo: new Float64Array(size * 5), kind: new Uint8Array(size * 2), pairs: buf ? buf.pairs : new Float64Array(7 * 4096) }
+        }
+        const geo = buf.geo, kind = buf.kind, typeCodes = Detector.typeCodes
+        for(let i=0;i<n;i++) {
+          const object = objects[i]
+          const w = object.w || object.size, h = object.h || object.size
+          const x = object.x, y = object.y
+          object.left = x - w
+          object.right = x + w
+          object.bottom = y - h
+          object.top = y + h
+          object.w = w
+          object.h = h
+          const j = i * 5
+          geo[j] = x
+          geo[j + 1] = y
+          geo[j + 2] = w
+          geo[j + 3] = h
+          geo[j + 4] = object.size
+          const code = typeCodes[object.type]
+          kind[i * 2] = (code === undefined || object.noCollide) ? 255 : code
+          kind[i * 2 + 1] = object.rectangular ? 1 : 0
+        }
+        let pairs = Detector.native.collide(n, geo, kind, slices, Detector.sliceWidth, Detector.pairRules, Detector.typeCount, buf.pairs)
+        if(pairs * 7 > buf.pairs.length) {
+          buf.pairs = new Float64Array(pairs * 14)
+          pairs = Detector.native.collide(n, geo, kind, slices, Detector.sliceWidth, Detector.pairRules, Detector.typeCount, buf.pairs)
+        }
+        const out = buf.pairs
+        for(let p=0;p<pairs;p++) {
+          const j = p * 7
+          const object = objects[out[j]], test = objects[out[j + 1]]
+          if(object.type === 'bullet' && test.type === 'bullet') {
+            const oa = object.object, ob = test.object
+            if(dimension.isSameTeam(oa, ob) && oa.type !== ob.type) { continue }
+            const ca = dimension.bulletClass[oa.type], cb = dimension.bulletClass[ob.type]
+            if(!(ca === cb && ca !== 0) && dimension.isSameTeam(oa.parent, ob.parent)) { continue }
+          }
+          if(out[j + 2]) {
+            const data = Detector.checkRect(object, test)
+            if(data.colliding) {
+              callback(data.circle, data.rect, data)
+            }
+          } else {
+            callback(object, test, { dx: out[j + 3], dy: out[j + 4], distance: out[j + 5], size: out[j + 6], colliding: true })
+          }
+        }
+        return pairs
+      },
       detectCollisions: function(objects, callback, limit) {
+        if(Detector.native && limit >= 0 && limit / Detector.sliceWidth <= 1000000) {
+          return Detector.detectNative(objects, callback, Math.ceil(limit / Detector.sliceWidth))
+        }
         const inverse = 1 / Detector.sliceWidth
         let objectsLength = objects.length
 	      if(limit >= 0) {

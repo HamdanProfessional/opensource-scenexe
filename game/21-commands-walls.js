@@ -64,7 +64,7 @@
         [[], function(data, tank, ws) {
           let a = tank.dim.walls.slice(tank.dim.defaultWalls)
           if(a.length > 0) {
-            ws.sendPacket('eval', `navigator.clipboard.writeText(${JSON.stringify(JSON.stringify(a))})`)
+            ws.sendPacket('eval', JSON.stringify(a))
             ws.sendPacket('announcement', 'Copied to clipboard')
           }
         }]

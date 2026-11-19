@@ -28,6 +28,88 @@
         }
         return data
       },
+      native: native && native.view ? native : null,
+      _native: null,
+      collect: function(objects, limit) {
+        if(!View.native) { return false }
+        const slices = limit >= 0 ? Math.ceil(limit / Detector.sliceWidth) : -1
+        if(slices > 1000000) { return false }
+        const n = objects.length
+        let buf = View._native
+        if(!buf || buf.size < n) {
+          const size = Math.max(1024, n * 2)
+          buf = View._native = { size: size, geo: new Float64Array(size * 4), kind: new Uint8Array(size), list: new Uint8Array(size), ids: new Float64Array(size), offsets: new Int32Array(size + 1), out: buf ? buf.out : new Int32Array(65536) }
+        }
+        const geo = buf.geo, kind = buf.kind, list = buf.list, ids = buf.ids
+        const fovs = []
+        for(let i=0;i<n;i++) {
+          const object = objects[i], j = i * 4
+          geo[j] = object.x
+          geo[j + 1] = object.y
+          if(object.type === 'fov') {
+            kind[i] = 1
+            geo[j + 2] = object.w || object.size
+            geo[j + 3] = object.h || object.size
+            fovs.push(object)
+          } else if(object.type === 'bullet') {
+            kind[i] = 2
+            geo[j + 2] = object.size
+            geo[j + 3] = object.size
+            const str = object.str, target = object.object
+            list[i] = str === 'tanks' ? 0 : str === 'bullets' ? 1 : str === 'polygons' ? 2 : 3
+            ids[i] = target ? target.id : -1
+          } else {
+            kind[i] = 0
+          }
+        }
+        let total = View.native.view(n, geo, kind, list, ids, slices, View.sliceWidth, View.cellSize, buf.offsets, buf.out)
+        if(total > buf.out.length) {
+          buf.out = new Int32Array(total * 2)
+          total = View.native.view(n, geo, kind, list, ids, slices, View.sliceWidth, View.cellSize, buf.offsets, buf.out)
+        }
+        const offsets = buf.offsets, out = buf.out
+        for(let f=0;f<fovs.length;f++) {
+          const fovObject = fovs[f], fov = fovObject.fov, viewer = fovObject.object
+          const visible = {}, bullets = [], polygons = []
+          for(let p=offsets[f],end=offsets[f + 1];p<end;p++) {
+            const item = objects[out[p]], c = item.object, str = item.str
+            if(str === 'tanks') {
+              visible[c.id] = c
+            } else if(str === 'bullets') {
+              bullets.push(c)
+            } else if(str === 'polygons') {
+              polygons.push(c)
+            } else {
+              fov[str][c.id] = c
+            }
+          }
+          fov.tanks = visible
+          viewer.fov.bullets = bullets
+          viewer.fov.polygons = polygons
+          viewer.fovVisible = visible
+        }
+        return true
+      },
+      _wake: null,
+      awake: function(polygons, wake) {
+        if(!View.native || !View.native.wake) { return null }
+        const n = polygons.length, count = wake.length >> 2
+        let buf = View._wake
+        if(!buf || buf.size < n || buf.wakeSize < count) {
+          const size = Math.max(1024, n * 2), wakeSize = Math.max(64, count * 2)
+          buf = View._wake = { size: size, wakeSize: wakeSize, polygons: new Float64Array(size * 3), wake: new Float64Array(wakeSize * 4), out: new Uint8Array(size) }
+        }
+        const p = buf.polygons
+        for(let i=0;i<n;i++) {
+          const polygon = polygons[i], j = i * 3
+          p[j] = polygon.x
+          p[j + 1] = polygon.y
+          p[j + 2] = polygon.size
+        }
+        buf.wake.set(wake)
+        View.native.wake(n, p, count, buf.wake, buf.out)
+        return buf.out
+      },
       detectCollisions: function(objects, callback, limit) {
         const inverse = 1 / View.sliceWidth
         if(limit >= 0) {

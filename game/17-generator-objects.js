@@ -6,6 +6,9 @@
 	    }
       let bullet = {
         id: generator.getId('bullet', options.dim),
+        _netFrame: -1,
+        _netRow: 0,
+        _netSerial: 0,
         type: barrel.data.type,
         visualType: barrel.data.visualType || barrel.data.type,
         parent: options.parent,
@@ -157,6 +160,8 @@
       }
       if(arrasPhysics.appliesToBullet(barrel.data, options.parent) && barrel.data.arras.family !== 'drone') {
         arrasPhysics.initBullet(bullet, barrel.data, options.parent, barrel.turret)
+      } else if(options.parent.physics === 'arras' && barrel.data.arras && barrel.data.arras.orbit) {
+        arrasPhysics.initOrbit(bullet, barrel.data)
       }
       b.bullets.push(bullet)
       options.parent.bullets[bullet.id] = bullet
@@ -179,6 +184,9 @@
         o: o,
         objectType: 'polygon',
         id: generator.getId('polygon', data.dim),
+        _netFrame: -1,
+        _netRow: 0,
+        _netSerial: 0,
         dim: data.dim || false,
         x: data.x || 0,
         y: data.y || 0,

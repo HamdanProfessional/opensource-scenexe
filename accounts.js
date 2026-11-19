@@ -8,6 +8,38 @@ const SHA256 = function(s) {
   return crypto.createHash('sha256').update(String(s)).digest('hex')
 }
 
+const SCRYPT = { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 }
+
+const scrypt = function(password, salt) {
+  return new Promise(function(resolve, reject) {
+    crypto.scrypt(String(password), salt, 32, SCRYPT, function(err, key) {
+      if(err) { return reject(err) }
+      resolve(key)
+    })
+  })
+}
+
+const hashPassword = async function(password) {
+  const salt = crypto.randomBytes(16)
+  const key = await scrypt(password, salt)
+  return 'scrypt$' + salt.toString('base64') + '$' + key.toString('base64')
+}
+
+const sameBytes = function(a, b) {
+  return a.length === b.length && crypto.timingSafeEqual(a, b)
+}
+
+const checkPassword = async function(account, password) {
+  const stored = String(account.password || '')
+  if(stored.startsWith('scrypt$')) {
+    const parts = stored.split('$')
+    const key = await scrypt(password, Buffer.from(parts[1], 'base64'))
+    return { ok: sameBytes(key, Buffer.from(parts[2], 'base64')), upgrade: false }
+  }
+  const ok = sameBytes(Buffer.from(SHA256(password)), Buffer.from(stored))
+  return { ok: ok, upgrade: ok }
+}
+
 let store = {}
 try {
   store = JSON.parse(fs.readFileSync(FILE).toString()) || {}
@@ -79,14 +111,16 @@ const Accounts = {
     })
   },
   create: function(o) {
-    return new Promise(function(resolve) {
+    return new Promise(async function(resolve) {
       const u = typeof o.username === 'string' ? o.username.toLowerCase() : ''
       if(!validUsername(u)) { return resolve({ success: false, message: 'Invalid username' }) }
       if(typeof o.password !== 'string' || o.password.length <= 0 || o.password.length > 30) {
         return resolve({ success: false, message: 'Invalid password' })
       }
       if(store[u]) { return resolve({ success: false, message: 'That username is taken' }) }
-      const a = normalize({ username: u, password: SHA256(o.password) })
+      const hashed = await hashPassword(o.password)
+      if(store[u]) { return resolve({ success: false, message: 'That username is taken' }) }
+      const a = normalize({ username: u, password: hashed })
       store[u] = a
       flushNow()
       resolve({ success: true, account: wrap(a) })
@@ -162,4 +196,4 @@ const updateGallery = function(gallery, sides, radiant) {
   return true
 }
 
-module.exports = { Accounts, achievements, SHA256, createAchievement, updateGallery }
+module.exports = { Accounts, achievements, SHA256, hashPassword, checkPassword, createAchievement, updateGallery }

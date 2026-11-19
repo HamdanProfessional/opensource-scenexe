@@ -18,6 +18,10 @@
       snakeScaleMax: 75,
       snakePullMax: 0.1,
       snakePullGain: 0.01,
+      orbitInner: 2.6,
+      orbitOuter: 3.9,
+      orbitSpin: 1.2,
+      orbitPull: 0.2,
       familyBodySpeed: { bullet: 3.75, swarm: 4.5, trap: 0, boomerang: 3.75 },
       familyRange: { bullet: 90, swarm: 225, trap: 450, boomerang: 120 },
       lifetimeScale: { bullet: 0.719, swarm: 0.719, trap: 1, boomerang: 1 },
@@ -88,7 +92,7 @@
       spring.cos = cos
       let bodyFamily = body !== tank && body.barrel && body.barrel.data.arras ? body.barrel.data.arras.family : null
       let bodyScale = bodyFamily ? c.projectileSpeedScale[bodyFamily] || 1 : 1
-      spring.strength = r * c.recoilGain * c.lengthScale * c.lengthScale * arrasPhysics.tickFactor() * bodyScale / body.size
+      spring.strength = (barrel.data.arras.negativeRecoil ? -1 : 1) * r * c.recoilGain * c.lengthScale * c.lengthScale * arrasPhysics.tickFactor() * bodyScale / body.size
       body.recoilSprings = body.recoilSprings || []
       if(body.recoilSprings.indexOf(spring) < 0) { body.recoilSprings.push(spring) }
     },
@@ -133,6 +137,28 @@
     isArrasDrone: function(bullet, tank) {
       let data = bullet.barrel && bullet.barrel.data
       return bullet.type === 2 && tank.physics === 'arras' && !!data && !!data.arras && data.arras.family === 'drone'
+    },
+    initOrbit: function(bullet, data) {
+      let orbit = data.arras.orbit
+      bullet.arrasOrbit = { phase: orbit.phase, speed: orbit.speed, sign: orbit.invert }
+      bullet.arrasTop = 0
+      if(data.arras.spin) { bullet.arrasSpin = data.arras.spin }
+    },
+    orbitGoal: function(bullet, time) {
+      let c = arrasPhysics.constants
+      let orbit = bullet.arrasOrbit
+      let owner = bullet.parent
+      let angle = orbit.phase + orbit.sign * orbit.speed * c.orbitSpin * time
+      let radius = owner.size * (orbit.sign < 0 ? c.orbitOuter : c.orbitInner)
+      return [owner.x + radius * Math.cos(angle), owner.y + radius * Math.sin(angle)]
+    },
+    orbit: function(bullet) {
+      let c = arrasPhysics.constants
+      let owner = bullet.parent
+      let now = arrasPhysics.orbitGoal(bullet, owner.timeExisted)
+      let next = arrasPhysics.orbitGoal(bullet, owner.timeExisted + dimension.tickTime)
+      bullet.xv = next[0] - now[0] + owner.xv + (now[0] - bullet.x) * c.orbitPull
+      bullet.yv = next[1] - now[1] + owner.yv + (now[1] - bullet.y) * c.orbitPull
     },
     droneIdleGoal: function(bullet, tank) {
       let c = arrasPhysics.constants
@@ -275,6 +301,11 @@
       bullet.yv = Math.sin(heading) * speed
       bullet.d = Math.atan2(-bullet.xv, bullet.yv)
     },
+    faceMotion: function(bullet) {
+      if(bullet.xv !== 0 || bullet.yv !== 0) {
+        bullet.d = Math.atan2(-bullet.xv, bullet.yv)
+      }
+    },
     home: function(bullet) {
       let owner = bullet.parent
       let target = false
@@ -337,10 +368,13 @@
       let step = 1 - Math.pow(1 - wave.pull, arrasPhysics.tickFactor())
       bullet.xv = (goalX - bullet.x) * step
       bullet.yv = (goalY - bullet.y) * step
+      arrasPhysics.faceMotion(bullet)
     },
     update: function(bullet) {
       arrasPhysics.applyRecoil(bullet)
-      if(bullet.arrasSnake) {
+      if(bullet.arrasOrbit) {
+        arrasPhysics.orbit(bullet)
+      } else if(bullet.arrasSnake) {
         arrasPhysics.snake(bullet)
       } else if(bullet.arrasHoming) {
         arrasPhysics.home(bullet)
@@ -356,7 +390,7 @@
       }
     },
     glide: function(bullet) {
-      if(bullet.arrasSnake) { return }
+      if(bullet.arrasSnake || bullet.arrasOrbit) { return }
       let v = Math.hypot(bullet.xv, bullet.yv)
       let excess = v - bullet.arrasTop
       if(excess > 0) {

@@ -11,6 +11,10 @@ commandLogs.on("error", e => console.warn("[commandlogs] disabled:", e.code || e
 
 let secret = {}
 
+const native = (function() {
+  try { return require('./native/index.js') } catch(e) { return null }
+})()
+
 const words = require('./shared/words.js')
 const checkName = function(str) {
   return !words.isBad(str)

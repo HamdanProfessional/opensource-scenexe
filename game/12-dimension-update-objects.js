@@ -145,6 +145,7 @@
         }
       }
       let frozenCount = 0
+      const awakeFlags = freeze ? View.awake(dim.polygons, wake) : null
       for(let i=dim.polygons.length-1;i>=0;i--) {
         let polygon = dim.polygons[i]
         if(options.gameUpdate) {
@@ -152,8 +153,12 @@
         }
         if(freeze) {
           let awake = false
-          for(let k=0,l=wake.length;k<l;k+=4) {
-            if(Math.abs(polygon.x - wake[k]) < wake[k + 2] + polygon.size && Math.abs(polygon.y - wake[k + 1]) < wake[k + 3] + polygon.size) { awake = true; break }
+          if(awakeFlags) {
+            awake = awakeFlags[i] === 1
+          } else {
+            for(let k=0,l=wake.length;k<l;k+=4) {
+              if(Math.abs(polygon.x - wake[k]) < wake[k + 2] + polygon.size && Math.abs(polygon.y - wake[k + 1]) < wake[k + 3] + polygon.size) { awake = true; break }
+            }
           }
           polygon.frozen = !awake
           if(!awake) {
@@ -365,7 +370,7 @@
           fovs.push(f)
         }
       }
-      if(options.netUpdate && fovs.length > 0) {
+      if(options.netUpdate && fovs.length > 0 && !View.collect(viewObjects, dim.mapSize)) {
         View.detectCollisions(viewObjects, function(objectA, objectB, data) {
           if(objectB.type === 'fov') {
             [objectA, objectB] = [objectB, objectA]

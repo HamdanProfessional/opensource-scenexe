@@ -34,7 +34,8 @@
     ws.sendPacket = function(type) {
       if(type in game.codes.receive && ws.send) {
         if(arguments.length > 1) {
-          ws.send(cPacket(pack([game.codes.receive[type], arguments[1]])))
+          const data = arguments[1]
+          ws.send(cPacket(data && data.raw === true ? net.encode(game.codes.receive[type], data) : pack([game.codes.receive[type], data])))
         } else {
           ws.send(cPacket(pack([game.codes.receive[type]])))
         }

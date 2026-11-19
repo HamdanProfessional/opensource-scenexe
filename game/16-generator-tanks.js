@@ -63,7 +63,7 @@
       let check = function(barrel) {
         tank._barrels.push(barrel)
         if(barrel.data.type === 1 || barrel.data.type === 3) {
-          barrel.maxTraps = 24 / barrel.data.reload * barrel.data.time
+          barrel.maxTraps = barrel.data.maxChildren > 0 ? barrel.data.maxChildren - 1 : 24 / barrel.data.reload * barrel.data.time
         }
         let size = barrel.data.relativeSizeS >= 0 ? barrel.data.relativeSizeS * barrel.data.width : barrel.data.width
         if(barrel.data && (barrel.data.type === 3 || barrel.data.type === 4 || barrel.data.bulletWeapon)) {

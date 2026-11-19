@@ -34,6 +34,7 @@ const ticket = (function() {
   const crypto = require('crypto')
   const key = crypto.randomBytes(32)
   const bits = Math.max(0, Math.min(24, envNum('POW_BITS') ?? config.powBits ?? 16))
+  const attackBits = Math.max(bits, Math.min(24, envNum('POW_ATTACK_BITS') ?? config.powAttackBits ?? 20))
   const used = new Map()
   const sign = function(body, ip) {
     return crypto.createHmac('sha256', key).update(body + '|' + ip).digest('base64url').slice(0, 22)
@@ -52,7 +53,8 @@ const ticket = (function() {
   }, 30000)
   return {
     issue: function(ip) {
-      const body = `${Date.now() + 60000}.${crypto.randomBytes(9).toString('base64url')}.${bits}`
+      const need = attackmode > performance.now() ? attackBits : bits
+      const body = `${Date.now() + 60000}.${crypto.randomBytes(9).toString('base64url')}.${need}`
       return body + '.' + sign(body, ip)
     },
     check: function(t, nonce, ip) {

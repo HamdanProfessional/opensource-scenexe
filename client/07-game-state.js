@@ -525,6 +525,7 @@
               bullet.sides = barrel.barrel.bulletSides
             }
             bullet.size = tank.size * barrel.barrel.relativeSize
+            bullet.stealthRates = barrel.barrel.stealth || null
           }
           if(tank.team === 5) {
             bullet.color = render.getTankColor(tank.team, bullet.sides)

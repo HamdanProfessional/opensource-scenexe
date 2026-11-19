@@ -5,7 +5,8 @@
         }
 
         dimension.confine(bullet, dim.mapSize - (bullet.size < 2 * dimension.clipSize ? bullet.size / 2 : bullet.size - dimension.clipSize), (dim.mapSizeSpeed > 0) ? (dim.mapSize > dim._mapSize ? dim.mapSizeSpeed : -dim.mapSizeSpeed) : 0)
-        if(arrasPhysics.isArrasDrone(bullet, tank)) {
+        if(bullet.arrasOrbit) {
+        } else if(arrasPhysics.isArrasDrone(bullet, tank)) {
           arrasPhysics.driveDrone(bullet, tank)
         } else if(bullet.type === 2 || bullet.type === 4) {
           let speed = dimension.tickMultiplier * bullet.speed * 0.05
@@ -73,6 +74,9 @@
                 active = !tank.passive
               }
               if(barrel.turret && !barrel.turret.active) {
+                active = false
+              }
+              if(barrel.data.maxChildren > 0 && !barrel.data.destroyOldest && barrel.bullets.length >= barrel.data.maxChildren) {
                 active = false
               }
             }

@@ -81,11 +81,26 @@ const anticheat = (function() {
   }
 
   const isBanned = function(ip) {
-    const until = bans[ip]
+    const key = ipGroup(ip)
+    const until = bans[key]
     if(!until) { return false }
     if(until <= Date.now()) {
-      delete bans[ip]
+      delete bans[key]
       return false
+    }
+    return true
+  }
+
+  const ban = function(ip, reason) {
+    if(exempt(ip) || isBanned(ip)) { return false }
+    const key = ipGroup(ip)
+    bans[key] = Date.now() + settings.banMinutes * 60 * 1000
+    const line = `[${new Date().toISOString()}] ${ip} temporarily banned for ${settings.banMinutes} minutes: ${reason}`
+    console.log('anticheat', line)
+    discordBot.send('spam', `${discordBot.code(ip)} temporarily banned for ${settings.banMinutes} minutes: ${discordBot.code(reason)}`)
+    try { fs.appendFileSync(logPath, line + '\n') } catch(e) {}
+    for(let i=clients.length-1;i>=0;i--) {
+      if(ipGroup(clients[i]._ip) === key) { try { clients[i].close() } catch(e) {} }
     }
     return true
   }
@@ -95,12 +110,13 @@ const anticheat = (function() {
     ws.anticheat.kicked = true
     log(ws, 'kicked: ' + reason)
     const now = Date.now()
-    const recent = (kicks[ws._ip] || []).filter(t => t > now - 10 * 60 * 1000)
+    const key = ipGroup(ws._ip)
+    const recent = (kicks[key] || []).filter(t => t > now - 10 * 60 * 1000)
     recent.push(now)
-    kicks[ws._ip] = recent
+    kicks[key] = recent
     if(recent.length >= settings.kicksBeforeBan && !exempt(ws._ip)) {
-      bans[ws._ip] = now + settings.banMinutes * 60 * 1000
-      delete kicks[ws._ip]
+      bans[key] = now + settings.banMinutes * 60 * 1000
+      delete kicks[key]
       log(ws, `temporarily banned for ${settings.banMinutes} minutes`)
     }
     try { ws.sendPacket('flag', 'cheat') } catch(e) {}
@@ -133,13 +149,15 @@ const anticheat = (function() {
   return {
     settings: settings,
     isBanned: isBanned,
+    ban: ban,
     log: log,
     canConnect: function(ip) {
       if(isBanned(ip)) { return 'banned' }
       if(exempt(ip)) { return true }
+      const key = ipGroup(ip)
       let count = 0
       for(let i=clients.length-1;i>=0;i--) {
-        if(clients[i]._ip === ip && clients[i].data && clients[i].data.open) { count ++ }
+        if(ipGroup(clients[i]._ip) === key && clients[i].data && clients[i].data.open) { count ++ }
       }
       return count < settings.maxConnectionsPerIp ? true : 'concurrent'
     },

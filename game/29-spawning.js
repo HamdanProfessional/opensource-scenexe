@@ -210,6 +210,6 @@
     args.parentPort.postMessage(['dimStats', c])
   }, 3000)
 
-  return { game, dimension, packer, generator, Detector, View, httpServer, server, commands, addBot }
+  return { game, dimension, packer, net, generator, Detector, View, httpServer, server, commands, addBot }
 }
 

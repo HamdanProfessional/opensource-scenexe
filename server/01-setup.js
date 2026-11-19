@@ -4,7 +4,7 @@ const fs = require("fs");
 const http = require('http');
 const url = require('url');
 const { Worker } = require('worker_threads');
-const { Accounts, achievements, SHA256, createAchievement, updateGallery } = require('./accounts.js');
+const { Accounts, achievements, SHA256, hashPassword, checkPassword, createAchievement, updateGallery } = require('./accounts.js');
 const words = require('./shared/words.js');
 
 const commandDataPath = 'command-data.txt'
@@ -56,6 +56,12 @@ const envNum = function(name) { return process.env[name] !== undefined && proces
 let debug = envNum('DEBUG') ?? config.debug ?? 1
 let fobs = envNum('OBFUSCATE') ?? config.obfuscate ?? 0
 console.log(debug ? 'Running on debug mode' : 'Running on normal mode')
+if(config.native === false || process.env.NATIVE === '0') {
+  process.env.NATIVE = '0'
+  console.log('native: C modules turned off, using JavaScript')
+} else {
+  try { require('./native/build.js').build() } catch(e) { console.log('native: ' + e.message) }
+}
 
 const cachedFiles = {
   robots: fs.readFileSync('./robots.txt').toString(),

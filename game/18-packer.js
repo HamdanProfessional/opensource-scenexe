@@ -95,6 +95,269 @@
           }
         }
         return out
+      },
+      bulletSig: function(b, i) {
+        return i === 0 ? (Math.floor((1 - b.health / b.maxHealth) * 10) || 0) : 0
+      },
+      polygonSig: function(p, i) {
+        return i === 0 ? (Math.floor((1 - p.health / p.maxHealth) * 100) || 0) : (p.sides | 0) * 1000 + (p.radiant | 0)
+      },
+      native: native && native.pick ? native : null,
+      frame: 0,
+      serial: 0,
+      scratch: null,
+      knownSize: function(state, kind) {
+        const table = state.tables && state.tables[kind]
+        return (table ? table.count : 0) + state.known[kind].size
+      },
+      pickMotion: function(state, kind, objects, removed, interval, sig, motion) {
+        if(!this.native) {
+          return this.pick(state, kind, objects, removed, interval, sig, null, motion)
+        }
+        const list = Array.isArray(objects) ? objects : Object.values(objects || {})
+        const length = list.length
+        let s = this.scratch
+        if(!s) {
+          s = this.scratch = { frame: -1, rows: 0, table: new Float64Array(12 * 1024), wire: new Float64Array(12 * 1024), turrets: new Float64Array(256), turretCount: 0, candidates: new Int32Array(1024), out: new Int32Array(1024), sent: new Int32Array(1024), bytes: new Uint8Array(65536), removed: new Float64Array(2048), info: new Int32Array(4), objects: [] }
+        }
+        if(s.frame !== this.frame) {
+          s.frame = this.frame
+          s.rows = 0
+          s.turretCount = 0
+        }
+        if(s.candidates.length < length) {
+          s.candidates = new Int32Array(length * 2)
+          s.out = new Int32Array(length * 2)
+        }
+        if((s.rows + length) * 12 > s.table.length) {
+          const size = Math.max(s.table.length * 2, (s.rows + length) * 24)
+          const grown = new Float64Array(size), grownWire = new Float64Array(size)
+          grown.set(s.table.subarray(0, s.rows * 12))
+          grownWire.set(s.wire.subarray(0, s.rows * 12))
+          s.table = grown
+          s.wire = grownWire
+        }
+        const stamp = this.frame * 3 + kind, table = s.table, candidates = s.candidates, objs = s.objects, wire = !!this.native.encode
+        let count = 0
+        for(let i=0;i<length;i++) {
+          const o = list[i]
+          if(!o || !(o.id >= 0)) { continue }
+          if(o._netFrame !== stamp) {
+            const row = s.rows ++, j = row * 12
+            o._netFrame = stamp
+            o._netRow = row
+            table[j] = o.id
+            table[j + 1] = o._netSerial || (o._netSerial = ++this.serial)
+            table[j + 2] = sig(o, 0)
+            table[j + 3] = sig(o, 1)
+            const m = motion(o)
+            if(m) {
+              table[j + 4] = 1
+              for(let k=0;k<7;k++) { table[j + 5 + k] = m[k] }
+            } else {
+              table[j + 4] = 0
+            }
+            if(wire) { this.fillWire(s, kind, o, j) }
+          }
+          candidates[count] = o._netRow
+          objs[count] = o
+          count ++
+        }
+        const tables = state.tables || (state.tables = [])
+        const known = tables[kind] || (tables[kind] = { count: 0, index: new Int32Array(0), entries: new Float64Array(0), spareIndex: new Int32Array(64), spareEntries: new Float64Array(14 * 32) })
+        if(known.spareIndex.length < 64 || known.spareIndex.length < count * 2) {
+          let size = 64
+          while(size < count * 3) { size *= 2 }
+          known.spareIndex = new Int32Array(size)
+        }
+        if(known.spareEntries.length < count * 14) {
+          known.spareEntries = new Float64Array(Math.ceil(count * 1.5) * 14)
+        }
+        if(s.removed.length < count + known.count) {
+          s.removed = new Float64Array((count + known.count) * 2)
+        }
+        s.info[0] = known.count
+        const sent = this.native.pick(count, candidates, table, known.index, known.entries, known.spareIndex, known.spareEntries, state.seq, this.keyframe, this.seqTime, s.out, s.removed, s.info)
+        const oldIndex = known.index, oldEntries = known.entries
+        known.index = known.spareIndex
+        known.entries = known.spareEntries
+        known.spareIndex = oldIndex
+        known.spareEntries = oldEntries
+        known.count = s.info[3]
+        const out = new Array(sent), picked = s.out, gone = s.removed
+        for(let p=0;p<sent;p++) { out[p] = objs[picked[p]] }
+        for(let p=0,l=s.info[2];p<l;p++) { removed.push(gone[p]) }
+        objs.length = 0
+        return out
+      },
+      Raw: function(bytes) {
+        this.bytes = bytes
+      },
+      bulletEntry: function(bullet) {
+        let arr = [
+          bullet.id,
+          Math.round(bullet.x),
+          Math.round(bullet.y),
+          (Math.round(bullet.d / Math.PI * 100) % 200 + 200) % 200,
+          Math.floor((1 - bullet.health / bullet.maxHealth) * 100),
+          Math.round(bullet.xv * dimension.tickRate),
+          Math.round(bullet.yv * dimension.tickRate)
+        ]
+        if(bullet.turrets && bullet.turrets[0]) {
+          let a = []
+          for(let i in bullet.turrets) {
+            let turret = bullet.turrets[i]
+            a.push((Math.round(turret.d / Math.PI * 100) % 200 + 200) % 200)
+          }
+          arr.push(a)
+        }
+        return arr
+      },
+      polygonEntry: function(polygon) {
+        return [
+          polygon.id,
+          Math.round(polygon.x),
+          Math.round(polygon.y),
+          (Math.round(polygon.d / Math.PI * 500) % 1000 + 1000) % 1000,
+          Math.floor((1 - polygon.health / polygon.maxHealth) * 500),
+          Math.round(polygon.xv * dimension.tickRate),
+          Math.round(polygon.yv * dimension.tickRate),
+          net.polygonMotion(polygon)[6]
+        ]
+      },
+      bulletSection: function(list) {
+        let data = [3]
+        let object = {}, ids = {}
+        for(let i=0,l=list.length;i<l;i++) {
+          let bullet = list[i]
+          let parentId = bullet.parentId
+          let barrelId = bullet.barrelId
+          if(!(parentId in object)) {
+            object[parentId] = {}
+            ids[parentId] = parentId
+          }
+          let obj = object[parentId]
+          let arr = net.bulletEntry(bullet)
+          if(barrelId in obj) {
+            obj[barrelId].push(arr)
+          } else {
+            obj[barrelId] = [barrelId, arr]
+          }
+        }
+        for(let parentId in object) {
+          let objects = object[parentId]
+          let obj = [ids[parentId]]
+          for(let barrelId in objects) {
+            obj.push(objects[barrelId])
+          }
+          data.push(obj)
+        }
+        return data
+      },
+      polygonSection: function(list) {
+        let data = [4]
+        let obj = {}, keys = {}, keys2 = {}
+        for(let i=0,l=list.length;i<l;i++) {
+          let polygon = list[i]
+          let object = obj[polygon.radiant]
+          if(!object) {
+            object = obj[polygon.radiant] = {}
+            keys[polygon.radiant] = polygon.radiant
+          }
+          if(object[polygon.sides]) {
+            object[polygon.sides][polygon.id] = polygon
+          } else {
+            let obj2 = {}
+            obj2[polygon.id] = polygon
+            object[polygon.sides] = obj2
+            keys2[polygon.sides] = polygon.sides
+          }
+        }
+        for(let radiant in obj) {
+          radiant = keys[radiant]
+          let object = obj[radiant]
+          let arr = [radiant]
+          for(let sides in object) {
+            let obj2 = object[sides]
+            let arr2 = [keys2[sides]]
+            for(let id in obj2) {
+              arr2.push(net.polygonEntry(obj2[id]))
+            }
+            arr.push(arr2)
+          }
+          data.push(arr)
+        }
+        return data
+      },
+      fillWire: function(s, kind, o, j) {
+        const wire = s.wire
+        if(kind === 1) {
+          const entry = net.bulletEntry(o)
+          wire[j] = o.parentId
+          wire[j + 1] = o.barrelId
+          for(let k=0;k<7;k++) { wire[j + 2 + k] = entry[k] }
+          wire[j + 9] = -1
+          wire[j + 10] = 0
+          if(entry.length > 7) {
+            const turrets = entry[7]
+            if(s.turretCount + turrets.length > s.turrets.length) {
+              const grown = new Float64Array(Math.max(s.turrets.length * 2, s.turretCount + turrets.length))
+              grown.set(s.turrets.subarray(0, s.turretCount))
+              s.turrets = grown
+            }
+            wire[j + 9] = turrets.length
+            wire[j + 10] = s.turretCount
+            for(let k=0;k<turrets.length;k++) { s.turrets[s.turretCount ++] = turrets[k] }
+          }
+          wire[j + 11] = typeof o.parentId === 'number' && typeof o.barrelId === 'number' && typeof entry[0] === 'number' ? 1 : 0
+        } else {
+          const entry = net.polygonEntry(o)
+          wire[j] = o.radiant
+          wire[j + 1] = o.sides
+          for(let k=0;k<8;k++) { wire[j + 2 + k] = entry[k] }
+          wire[j + 10] = 0
+          wire[j + 11] = typeof o.radiant === 'number' && typeof o.sides === 'number' && typeof entry[0] === 'number' ? 1 : 0
+        }
+      },
+      rawSection: function(kind, list) {
+        const s = this.scratch
+        if(!this.native || !this.native.encode || !s || s.frame !== this.frame) { return null }
+        const n = list.length, stamp = this.frame * 3 + kind, wire = s.wire
+        if(s.sent.length < n) { s.sent = new Int32Array(n * 2) }
+        const rows = s.sent
+        for(let i=0;i<n;i++) {
+          const o = list[i]
+          if(!o || o._netFrame !== stamp) { return null }
+          const row = o._netRow
+          if(wire[row * 12 + 11] !== 1) { return null }
+          rows[i] = row
+        }
+        let size = this.native.encode(kind, n, rows, wire, s.turrets, s.bytes)
+        if(size > s.bytes.length) {
+          s.bytes = new Uint8Array(size * 2)
+          size = this.native.encode(kind, n, rows, wire, s.turrets, s.bytes)
+        }
+        return new this.Raw(Buffer.from(s.bytes.subarray(0, size)))
+      },
+      arrayHeader: function(count) {
+        if(count < 16) { return Buffer.from([0x90 | count]) }
+        if(count < 65536) { return Buffer.from([0xdc, count >> 8, count & 255]) }
+        return Buffer.from([0xdd, (count >>> 24) & 255, (count >> 16) & 255, (count >> 8) & 255, count & 255])
+      },
+      encode: function(code, packet) {
+        const n = packet.length, parts = [Buffer.from([0x92]), pack([code]).subarray(1), this.arrayHeader(n)]
+        let start = 0
+        for(let i=0;i<=n;i++) {
+          if(i === n || packet[i] instanceof this.Raw) {
+            if(i > start) {
+              const run = packet.slice(start, i)
+              parts.push(pack(run).subarray(run.length < 16 ? 1 : run.length < 65536 ? 3 : 5))
+            }
+            if(i < n) { parts.push(packet[i].bytes) }
+            start = i + 1
+          }
+        }
+        return Buffer.concat(parts)
       }
     }
   })()
@@ -337,16 +600,12 @@
         for(let i=0,l=t._turrets.length;i<l;i++) { k += ',' + ((Math.round(t._turrets[i].d / Math.PI * 50) % 100 + 100) % 100) }
         return k
       })
-      const sendBullets = net.pick(state, 1, options.bullets, removed[1], function(b) {
+      const sendBullets = net.pickMotion(state, 1, options.bullets, removed[1], function(b) {
         return net.bullets[isNear(b) ? 0 : 1]
-      }, function(b, i) {
-        return i === 0 ? (Math.floor((1 - b.health / b.maxHealth) * 10) || 0) : 0
-      }, null, net.bulletMotion)
-      const sendPolygons = net.pick(state, 2, options.polygons, removed[2], function(p) {
+      }, net.bulletSig, net.bulletMotion)
+      const sendPolygons = net.pickMotion(state, 2, options.polygons, removed[2], function(p) {
         return net.polygons[isNear(p) ? 0 : 1]
-      }, function(p, i) {
-        return i === 0 ? (Math.floor((1 - p.health / p.maxHealth) * 100) || 0) : (p.sides | 0) * 1000 + (p.radiant | 0)
-      }, null, net.polygonMotion)
+      }, net.polygonSig, net.polygonMotion)
       if(removed[0].length || removed[1].length || removed[2].length) {
         packet.push([19, removed[0], removed[1], removed[2]])
       }
@@ -428,95 +687,22 @@
         packet.push(data)
       }
       if(sendBullets.length) {
-        let data = [3]
-        let object = {}, ids = {}
-        for(let i=0,l=sendBullets.length;i<l;i++) {
-          let bullet = sendBullets[i]
-          let parentId = bullet.parentId
-          let barrelId = bullet.barrelId
-          if(!(parentId in object)) {
-            object[parentId] = {}
-            ids[parentId] = parentId
-          }
-          let obj = object[parentId]
-          let arr = [
-            bullet.id,
-            Math.round(bullet.x),
-            Math.round(bullet.y),
-            (Math.round(bullet.d / Math.PI * 100) % 200 + 200) % 200,
-            Math.floor((1 - bullet.health / bullet.maxHealth) * 100),
-            Math.round(bullet.xv * dimension.tickRate),
-            Math.round(bullet.yv * dimension.tickRate)
-          ]
-          if(bullet.turrets && bullet.turrets[0]) {
-            let a = []
-            for(let i in bullet.turrets) {
-              let turret = bullet.turrets[i]
-              a.push((Math.round(turret.d / Math.PI * 100) % 200 + 200) % 200)
-            }
-            arr.push(a)
-          }
-          if(barrelId in obj) {
-            obj[barrelId].push(arr)
-          } else {
-            obj[barrelId] = [barrelId, arr]
-          }
+        const raw = net.rawSection(1, sendBullets)
+        if(raw) {
+          packet.push(raw)
+          packet.raw = true
+        } else {
+          packet.push(net.bulletSection(sendBullets))
         }
-        for(let parentId in object) {
-          let objects = object[parentId]
-          let obj = [ids[parentId]]
-          for(let barrelId in objects) {
-            obj.push(objects[barrelId])
-          }
-          data.push(obj)
-        }
-        packet.push(data)
       }
       if(sendPolygons.length) {
-        let data = [4]
-        let obj = {}, keys = {}, keys2 = {}
-
-        for(let i=0,l=sendPolygons.length;i<l;i++) {
-          let polygon = sendPolygons[i]
-          let object = obj[polygon.radiant]
-          if(!object) {
-            object = obj[polygon.radiant] = {}
-            keys[polygon.radiant] = polygon.radiant
-          }
-          if(object[polygon.sides]) {
-            object[polygon.sides][polygon.id] = polygon
-          } else {
-            let obj2 = {}
-            obj2[polygon.id] = polygon
-            object[polygon.sides] = obj2
-            keys2[polygon.sides] = polygon.sides
-          }
+        const raw = net.rawSection(2, sendPolygons)
+        if(raw) {
+          packet.push(raw)
+          packet.raw = true
+        } else {
+          packet.push(net.polygonSection(sendPolygons))
         }
-        for(let radiant in obj) {
-          radiant = keys[radiant]
-          let object = obj[radiant]
-          let arr = [radiant]
-          for(let sides in object) {
-            let obj2 = object[sides]
-            let arr2 = [keys2[sides]]
-            for(let id in obj2) {
-              let polygon = obj2[id]
-              arr2.push([
-                polygon.id,
-                Math.round(polygon.x),
-                Math.round(polygon.y),
-                (Math.round(polygon.d / Math.PI * 500) % 1000 + 1000) % 1000,
-                Math.floor((1 - polygon.health / polygon.maxHealth) * 500),
-                Math.round(polygon.xv * dimension.tickRate),
-                Math.round(polygon.yv * dimension.tickRate),
-                net.polygonMotion(polygon)[6]
-              ])
-            }
-            arr.push(arr2)
-          }
-          data.push(arr)
-        }
-        packet.push(data)
       }
       if(Object.keys(options.dim.leaderboardChanges)[0] >= 0) {
         let data = [5].concat(options.dim.leaderboardChanges)
@@ -654,7 +840,7 @@
         }
         packet.push(data)
       }
-      if(packet.length === 3 && state.sentScore === options.score && state.seq - state.sentSeq < net.keepalive && !state.known[1].size && !state.known[2].size) { return null }
+      if(packet.length === 3 && state.sentScore === options.score && state.seq - state.sentSeq < net.keepalive && !net.knownSize(state, 1) && !net.knownSize(state, 2)) { return null }
       state.sentScore = options.score
       state.sentSeq = state.seq
       return packet

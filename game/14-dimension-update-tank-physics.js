@@ -250,6 +250,8 @@
             } else {
               active = tank.passive ? tank.firing : true
             }
+          } else if(barrel.data.maxChildren > 0 && !barrel.data.destroyOldest && barrel.bullets.length >= barrel.data.maxChildren) {
+            active = false
           }
           if(active) {
             if(barrel.current >= reload) {

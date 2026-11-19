@@ -511,7 +511,11 @@
         for(let i=0;i<lengthBullets;i++) {
           let bullet = data.bullets[i]
           if(render.inFOVPad(bullet, bullet.size * 2)) {
-            render.drawBullet(bullet)
+            let shown = render.bulletAlpha(bullet)
+            ctx.globalAlpha = render.drawAlpha = render.opacity.bullets * shown
+            if(shown > 0.01) {
+              render.drawBullet(bullet)
+            }
           }
         }
         ctx.globalAlpha = render.drawAlpha = 1

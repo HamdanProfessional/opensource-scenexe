@@ -75,7 +75,13 @@ const PROJECTILE_TYPE_TO_FAMILY = {
   minion: 'minion'
 }
 
-const PROJECTILE_FAMILIES_WITH_GUNS = ['bullet', 'swarm', 'trap']
+const PROJECTILE_FAMILIES_WITH_GUNS = ['bullet', 'swarm', 'trap', 'boomerang']
+
+const DEFAULT_SNAKE = { invert: 1, period: 5, amplitude: 150, yOffset: 0, angle: 0 }
+
+const DEFAULT_SATELLITE_SPEED = 2
+
+const DEFAULT_SPIN = 0.04
 
 const FIXED_RANGE_CALCULATORS = ['sustained', 'sustained+lowspeed', 'trap', 'block']
 
@@ -87,7 +93,7 @@ const DRONE_TOUGHNESS = {
   bigCheese: 2.5
 }
 
-const MAX_PROJECTILE_GUN_DEPTH = 2
+const MAX_PROJECTILE_GUN_DEPTH = 3
 
 const round = function(value, places) {
   const factor = Math.pow(10, places === undefined ? 4 : places)
@@ -201,6 +207,7 @@ const makeConverter = function(classTable, report) {
 
   const spinSpeed = function(projectile) {
     const facing = projectile.FACING_TYPE
+    if(facing === 'spin') { return DEFAULT_SPIN }
     if(Array.isArray(facing) && facing[0] === 'spin' && facing[1] && typeof facing[1].speed === 'number') {
       return facing[1].speed
     }
@@ -211,21 +218,60 @@ const makeConverter = function(classTable, report) {
     return Array.isArray(projectile.MOTION_TYPE) ? projectile.MOTION_TYPE[0] : projectile.MOTION_TYPE
   }
 
-  const snakeSettings = function(projectile) {
+  const ancestry = function(type) {
+    const names = new Set()
+    const visit = function(def, depth) {
+      if(!def || typeof def !== 'object' || depth > 40) { return }
+      for(const parent of def.PARENT === undefined ? [] : [].concat(def.PARENT)) {
+        if(typeof parent === 'string') {
+          names.add(parent)
+          visit(lookup(parent), depth + 1)
+        } else {
+          visit(parent, depth + 1)
+        }
+      }
+    }
+    if(typeof type === 'string') {
+      names.add(type)
+      visit(lookup(type), 0)
+    } else if(Array.isArray(type)) {
+      for(const name of ancestry(type[0])) { names.add(name) }
+      visit(type[1], 0)
+    } else {
+      visit(type, 0)
+    }
+    return names
+  }
+
+  const controllerOptions = function(projectile, wanted) {
     if(!Array.isArray(projectile.CONTROLLERS)) { return null }
     for(const entry of projectile.CONTROLLERS) {
       const name = Array.isArray(entry) ? entry[0] : entry
-      if(name !== 'snake') { continue }
-      const opts = Array.isArray(entry) && entry[1] ? entry[1] : {}
-      return {
-        invert: opts.invert ? -1 : 1,
-        period: round(opts.period === undefined ? 5 : opts.period),
-        amplitude: round(opts.amplitude === undefined ? 150 : opts.amplitude),
-        yOffset: round(opts.yOffset || 0),
-        angle: round(opts.angle || 0)
-      }
+      if(name === wanted) { return Array.isArray(entry) && entry[1] ? entry[1] : {} }
     }
     return null
+  }
+
+  const snakeSettings = function(projectile, lineage) {
+    const opts = controllerOptions(projectile, 'snake') || (lineage.has('snake') ? DEFAULT_SNAKE : null)
+    if(!opts) { return null }
+    return {
+      invert: opts.invert ? -1 : 1,
+      period: round(opts.period === undefined ? DEFAULT_SNAKE.period : opts.period),
+      amplitude: round(opts.amplitude === undefined ? DEFAULT_SNAKE.amplitude : opts.amplitude),
+      yOffset: round(opts.yOffset || 0),
+      angle: round(opts.angle || 0)
+    }
+  }
+
+  const orbitSettings = function(projectile, owner) {
+    const opts = controllerOptions(projectile, 'orbit') || {}
+    const ai = owner && owner.AI
+    return {
+      speed: round(ai && typeof ai.SPEED === 'number' ? ai.SPEED : DEFAULT_SATELLITE_SPEED),
+      invert: opts.invert ? -1 : 1,
+      phase: round((projectile.ANGLE || 0) * Math.PI / 180)
+    }
   }
 
   const turnWithSpeed = function(projectile) {
@@ -241,7 +287,7 @@ const makeConverter = function(classTable, report) {
     return { movementSpeed: 1, maxHealth: 1, bodyDamage: 1, cameraSizeMultiplier: 1, sides, turrets, auras: [] }
   }
 
-  const convertGun = function(gun, depth, insideIndependent) {
+  const convertGun = function(gun, depth, insideIndependent, owner) {
     if(!gun || typeof gun !== 'object') { count('skippedGuns', 'malformed'); return null }
     const p = normalizeGunPosition(gun.POSITION)
     const hb = p.A > 0 ? p.W / 2 : Math.abs(p.A) * p.W / 2
@@ -293,7 +339,7 @@ const makeConverter = function(classTable, report) {
       return barrel
     }
     const ref = FAMILY_REFERENCE[family]
-    if(projectile.TYPE === 'satellite') { count('approximations', 'satellites act as drones') }
+    const lineage = ancestry(props.TYPE)
     const spray = stat(settings, 'spray')
     const shudder = stat(settings, 'shudder')
     barrel.type = ref.type
@@ -316,7 +362,7 @@ const makeConverter = function(classTable, report) {
         barrel.type = 10
         delete barrel.drones
       } else {
-        const minionGuns = convertGuns(projectile.GUNS || [], depth + 1)
+        const minionGuns = convertGuns(projectile.GUNS || [], depth + 1, false, projectile)
         for(const sub of minionGuns) {
           const subRef = sub.arras && FAMILY_REFERENCE[sub.arras.family]
           if(subRef) { sub.penetration = subRef.penetration }
@@ -336,13 +382,14 @@ const makeConverter = function(classTable, report) {
       barrel.bulletStar = star
     }
     if(PROJECTILE_FAMILIES_WITH_GUNS.indexOf(family) >= 0 && depth < MAX_PROJECTILE_GUN_DEPTH) {
-      const subBarrels = convertGuns(projectile.GUNS || [], depth + 1, !!projectile.INDEPENDENT)
-      const subTurrets = family === 'trap' ? convertTurrets(projectile.TURRETS, {}) : []
+      const subBarrels = convertGuns(projectile.GUNS || [], depth + 1, !!projectile.INDEPENDENT, projectile)
+      const subTurrets = family === 'swarm' ? [] : convertTurrets(projectile.TURRETS, {})
       if(subBarrels.length || subTurrets.length) {
+        const solid = family === 'trap' || family === 'boomerang'
         barrel.bulletWeapon = { barrels: subBarrels, weaponTurrets: [] }
-        barrel.bulletBody = makeBulletBody(family === 'trap' ? 4 : 0, subTurrets)
+        barrel.bulletBody = makeBulletBody(solid ? 4 : 0, subTurrets)
         if(star) { barrel.bulletBody.star = star }
-        if(family === 'trap') { barrel.type = 3 }
+        if(solid) { barrel.type = 3 }
       }
     }
     if((family === 'drone' || family === 'swarm' || family === 'minion') && depth < MAX_PROJECTILE_GUN_DEPTH && Array.isArray(projectile.TURRETS) && projectile.TURRETS.length) {
@@ -352,6 +399,14 @@ const makeConverter = function(classTable, report) {
         const sides = typeof projectile.SHAPE === 'number' && projectile.SHAPE >= 3 ? projectile.SHAPE : family === 'minion' ? 0 : 3
         barrel.bulletBody = barrel.bulletBody ? Object.assign({}, barrel.bulletBody, { turrets: barrel.bulletBody.turrets.concat(riders) }) : makeBulletBody(sides, riders)
       }
+    }
+    if(projectile.HEALER) { barrel.healer = true }
+    if(Array.isArray(projectile.INVISIBLE) && (projectile.INVISIBLE[0] > 0 || projectile.INVISIBLE[1] > 0)) {
+      barrel.stealth = [round(projectile.INVISIBLE[0]), round(projectile.INVISIBLE[1])]
+    }
+    if(typeof props.MAX_CHILDREN === 'number' && family !== 'drone' && family !== 'minion') {
+      barrel.maxChildren = props.MAX_CHILDREN
+      if(props.DESTROY_OLDEST_CHILD) { barrel.destroyOldest = true }
     }
     if(props.SHOOT_ON_DEATH) { barrel.shootOnDeath = true }
     if(props.AUTOFIRE) { barrel.autoFire = true }
@@ -365,8 +420,12 @@ const makeConverter = function(classTable, report) {
     }
     if(projectile.BODY && typeof projectile.BODY.RANGE === 'number') { barrel.arras.bodyRange = projectile.BODY.RANGE }
     if(FIXED_RANGE_CALCULATORS.indexOf(props.STAT_CALCULATOR) >= 0) { barrel.arras.fixedRange = true }
-    const snake = snakeSettings(projectile)
+    const snake = snakeSettings(projectile, lineage)
     if(snake) { barrel.arras.snake = snake }
+    if(projectile.TYPE === 'satellite' || hasController(projectile, 'orbit') || controllerOptions(projectile, 'orbit')) {
+      barrel.arras.orbit = orbitSettings(projectile, owner)
+    }
+    if(props.NEGATIVE_RECOIL) { barrel.arras.negativeRecoil = true }
     if(family === 'swarm') { barrel.arras.homing = true }
     if(family === 'swarm' && insideIndependent) { barrel.arras.autoTarget = true }
     if(family === 'boomerang') { barrel.arras.boomerang = true }
@@ -379,10 +438,10 @@ const makeConverter = function(classTable, report) {
     return barrel
   }
 
-  const convertGuns = function(guns, depth, insideIndependent) {
+  const convertGuns = function(guns, depth, insideIndependent, owner) {
     const out = []
     for(const gun of guns || []) {
-      const barrel = convertGun(gun, depth, insideIndependent)
+      const barrel = convertGun(gun, depth, insideIndependent, owner)
       if(barrel) { out.push(barrel) }
     }
     return out
@@ -408,7 +467,7 @@ const makeConverter = function(classTable, report) {
       }
       if(layer === 'under' && pos.LAYER > 0) { continue }
       if(layer === 'over' && pos.LAYER <= 0) { continue }
-      const barrels = convertGuns(guns, 0)
+      const barrels = convertGuns(guns, 0, false, cls)
       if(!barrels.length) { count('skippedTurrets', 'no convertible guns'); continue }
       const a = pos.ANGLE * Math.PI / 180
       const forward = (pos.X * Math.cos(a) - pos.Y * Math.sin(a)) / 10
@@ -461,7 +520,7 @@ const makeConverter = function(classTable, report) {
     const weapon = {
       label,
       cameraSizeMultiplier: 1,
-      barrels: convertGuns(resolved.GUNS, 0),
+      barrels: convertGuns(resolved.GUNS, 0, false, resolved),
       weaponTurrets: convertTurrets(resolved.TURRETS, {}, 'under'),
       renderBody: key,
       pairedBody: key

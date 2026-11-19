@@ -70,6 +70,20 @@
           }
         }
       },
+      bulletStealth: function(bullet, dt) {
+        let moved = bullet.stealthX === undefined ? 1 : Math.hypot(bullet.x - bullet.stealthX, bullet.y - bullet.stealthY)
+        bullet.stealthX = bullet.x
+        bullet.stealthY = bullet.y
+        let ticks = dt * 0.03
+        let still = dt > 0 && moved / dt <= 0.0237
+        let alpha = bullet.stealthShown >= 0 ? bullet.stealthShown : 1
+        alpha += still ? -bullet.stealthRates[1] * ticks : bullet.stealthRates[0] * ticks
+        bullet.stealthShown = Math.max(0, Math.min(1, alpha))
+      },
+      bulletAlpha: function(bullet) {
+        if(!bullet.stealthRates) { return 1 }
+        return bullet.parent === gameData.me ? Math.max(bullet.stealthShown, render.selfStealthFloor) : bullet.stealthShown
+      },
       updateBullet: function(bullet, dt) {
         if(bullet.fadeTime < 1) {
           bullet.fadeTime -= dt * 0.006
@@ -92,6 +106,7 @@
           bullet.passiveFade = bullet.parent.passiveFade
         }
         render.moveObject(bullet)
+        if(bullet.stealthRates) { render.bulletStealth(bullet, dt) }
         bullet.damageFlash = util.average(bullet.damageFlash, bullet._damageFlash, 15)
         let tank = bullet.parent
         if(tank) {

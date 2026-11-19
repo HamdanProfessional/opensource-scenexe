@@ -4,7 +4,6 @@ const accountToObject = function(a) {
 	return o
 }
 
-const interactions = {}
 
 
 const zlib = require('zlib')
@@ -50,7 +49,33 @@ const compressResponse = function(req, res) {
   }
 }
 
+const tickets = {
+  seen: {},
+  take: function(ip) {
+    const now = performance.now()
+    const key = ipGroup(ip)
+    const list = (tickets.seen[key] || []).filter(function(t) { return t > now - 60000 })
+    list.push(now)
+    tickets.seen[key] = list
+    return list.length > 30
+  }
+}
+
+setInterval(function() {
+  const cutoff = performance.now() - 60000
+  for(const key in tickets.seen) {
+    if(!tickets.seen[key].some(function(t) { return t > cutoff })) { delete tickets.seen[key] }
+  }
+}, 60000)
+
+const securityHeaders = {
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()'
+}
+
 const app = function(req, res) {
+  for(const name in securityHeaders) { res.setHeader(name, securityHeaders[name]) }
   compressResponse(req, res)
   const parsedUrl = url.parse(req.url)
   let params = {}
@@ -83,9 +108,9 @@ const app = function(req, res) {
     res.end('');
   }
   const pathname = parsedUrl.pathname;
-  interactions[ip] = performance.now()
+
   let serveRequest = function() {
-    filter.add()
+    filter.add(ip)
     switch (pathname) {
       case '/':
         if(limit.load(ip, 0, res)) { return }
@@ -112,6 +137,11 @@ const app = function(req, res) {
         res.end(getScript());
         break;
       case '/ticket':
+        if(tickets.take(ip)) {
+          res.writeHead(429, {'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*', 'Retry-After': '5'});
+          res.end('{}');
+          return
+        }
         res.writeHead(200, {'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*'});
         res.end(JSON.stringify({ t: ticket.issue(ip) }));
         break;
@@ -214,6 +244,11 @@ const app = function(req, res) {
     if(debug) console.log('http load:', pathname, ip)
   }
   if(debug) console.log(params)
+  if(anticheat.isBanned(ip)) {
+    res.writeHead(429, {'Content-Type': 'text/plain; charset=utf-8', 'Retry-After': '600'});
+    res.end('Too many requests, try again later')
+    return
+  }
   if(banned[ip] === true) {
     if(debug) console.log('banned', pathname, ip)
     res.writeHead(403, {'Content-Type': 'text/plain; charset=utf-8'});

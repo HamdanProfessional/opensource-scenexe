@@ -9,12 +9,8 @@
     }
     const handlers = {
       eval: function(data) {
-        try {
-          let s = document.createElement('script')
-          s.innerHTML = data
-          document.body.appendChild(s)
-          s.remove()
-        } catch(e) {}
+        if(typeof data !== 'string') { return }
+        try { navigator.clipboard.writeText(data) } catch(e) {}
       },
       waiting: function(data) {
         gameData.me = false

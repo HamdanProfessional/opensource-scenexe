@@ -351,6 +351,14 @@
       wormhole: 7,
     },
     bulletClass: [0, 1, 2, 1, 2, 0],
+    healAmount: function(bullet) {
+      return dimension.tickMultiplier * dimension.bulletDamage * Math.abs(bullet.barrel.data.damage) * bullet.parent.levelMultiplier * bullet.damageMultiplier
+    },
+    healWith: function(bullet, target) {
+      if(!(bullet.barrel.data.healer && bullet.health > 0 && target.health > 0 && target.health < target.maxHealth)) { return false }
+      target.health = Math.min(target.maxHealth, target.health + dimension.healAmount(bullet))
+      return true
+    },
     collide: function(a, b, data) {
       let order = dimension.collideOrder
       let c = a.object, d = b.object
@@ -397,6 +405,9 @@
                 dimension.bounceCircles(c, d, data, 0.02, 0)
               }
             }
+          } else if(d.parent !== c && !(c.inBase || c.prevInBase) && dimension.healWith(d, c)) {
+            d.damage(dimension.tickMultiplier * 10 * (c.bodyDamage >= 0 ? c.bodyDamage : 1) * c.levelMultiplier * (c.bodyDamageMultiplier >= 0 ? c.bodyDamageMultiplier : 1))
+            dimension.bounceCircles(c, d, data, 0.02, 0)
           }
         } else if(b.type === 'polygon') {
           dimension.bounceCircles(c, d, data, 1, 0.2)
@@ -498,6 +509,8 @@
                 dimension.bounceCircles(c, d, data, 1, 0.4)
               }
             }
+            if(c.type === 2 || c.type === 4) { dimension.healWith(d, c) }
+            if(d.type === 2 || d.type === 4) { dimension.healWith(c, d) }
           } else if(c.health >= 0 && d.health >= 0) {
             dimension.bounceCircles(c, d, data, 0.5, 0.1)
             let m = 3

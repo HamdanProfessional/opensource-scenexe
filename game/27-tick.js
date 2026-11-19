@@ -79,6 +79,7 @@
       }
       if(netUpdate) {
         netCounter = 0
+        net.frame ++
         for(let i=dim.tanks.length-1;i>=0;i--) {
           let tank = dim.tanks[i]
           let ws = tank.ws
