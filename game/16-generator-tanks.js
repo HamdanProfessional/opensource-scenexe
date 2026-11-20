@@ -136,6 +136,7 @@
         }
       }
       tank.removeBullets()
+      codeTanks.attach(tank)
     },
     checkWeaponTurrets: function(weapon, tank, size) {
       let r = []
@@ -374,6 +375,7 @@
         clip: data.clip || false,
         firing: false,
         droneControl: false,
+        droneCount: 0,
         firedBarrels: {},
         spawnedAt: Date.now(),
         kills: 0,

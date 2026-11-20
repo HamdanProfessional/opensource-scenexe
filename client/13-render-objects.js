@@ -119,6 +119,9 @@
           let barrel = tank._barrels[bullet.barrelId]
           if(barrel) {
             bullet.size = tank.size * barrel.barrel.relativeSize
+          } else {
+            let shot = render.codeShot(tank, bullet.barrelId)
+            if(shot) { bullet.size = tank.size * shot.size }
           }
         }
         if(bullet.turrets && bullet.turrets[0]) {

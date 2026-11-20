@@ -526,6 +526,16 @@
             }
             bullet.size = tank.size * barrel.barrel.relativeSize
             bullet.stealthRates = barrel.barrel.stealth || null
+          } else {
+            let shot = render.codeShot(tank, object.barrelId)
+            if(shot) {
+              bullet.size = tank.size * shot.size
+              bullet.sides = shot.kind === 'trap' ? 4 : shot.kind === 'drone' ? 3 : 0
+              if(shot.look >= 0) {
+                bullet.code = tank.code
+                bullet.codeLook = shot.look
+              }
+            }
           }
           if(tank.team === 5) {
             bullet.color = render.getTankColor(tank.team, bullet.sides)

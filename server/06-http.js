@@ -111,6 +111,9 @@ const app = function(req, res) {
 
   let serveRequest = function() {
     filter.add(ip)
+    if(pathname === '/admin' || pathname.startsWith('/admin/')) {
+      return adminPanel.handle(req, res, pathname, ip)
+    }
     switch (pathname) {
       case '/':
         if(limit.load(ip, 0, res)) { return }
@@ -145,6 +148,17 @@ const app = function(req, res) {
         res.writeHead(200, {'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*'});
         res.end(JSON.stringify({ t: ticket.issue(ip) }));
         break;
+      case '/tankcode': {
+        const code = tankCodes[String(params.n || '').toLowerCase()]
+        if(!code) {
+          res.writeHead(404, {'Content-Type': 'application/json', 'Cache-Control': 'no-store'});
+          res.end('{}');
+          break
+        }
+        res.writeHead(200, {'Content-Type': 'application/json', 'Cache-Control': 'no-cache'});
+        res.end(code.json);
+        break
+      }
       case '/blank':
         return blank()
       case '/logo.svg':
@@ -252,7 +266,7 @@ const app = function(req, res) {
   if(banned[ip] === true) {
     if(debug) console.log('banned', pathname, ip)
     res.writeHead(403, {'Content-Type': 'text/plain; charset=utf-8'});
-    res.end(`Banned! This was probably a mistake`)
+    res.end(`${banMessage(banDetails[ip])}. If you think this is a mistake, ask on the Discord.`)
     return
   }
   serveRequest()

@@ -155,6 +155,11 @@
           ctx.rotate(d)
           render.scaleFade(tank.fadeTime)
         }
+        if(tank.code && render.drawCodeTank(tank, color)) {
+          ctx.setTransform(transform)
+          if(ctx.globalAlpha !== render.drawAlpha) { ctx.globalAlpha = render.drawAlpha }
+          return
+        }
         if(tank.outerSize && tank.outerSides >= 0 && tank.sides !== 1) {
           let s = 0
           if (tank.outerSides && tank.outerSides !== 8 && tank.outerSides !== 4 && tank.outerSides !== 0) {

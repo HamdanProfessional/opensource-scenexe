@@ -21,6 +21,10 @@
           disconnectText.textContent = data === 'banned' ? 'Banned' : data === 'kicked' ? 'Kicked by a moderator' : data === 'cheat' ? 'Kicked by anticheat' : 'Too many connections from your network'
           disconnectText.style.color = data === 'concurrent' ? 'rgb(255, 100, 0)' : 'rgb(255, 0, 0)'
           if(gameCurrentServer.ws) { gameCurrentServer.ws.reconnect = false }
+        } else if(Array.isArray(data) && (data[0] === 'banned' || data[0] === 'kicked')) {
+          disconnectText.textContent = String(data[1] || (data[0] === 'banned' ? 'Banned' : 'Kicked by a moderator'))
+          disconnectText.style.color = 'rgb(255, 0, 0)'
+          if(gameCurrentServer.ws) { gameCurrentServer.ws.reconnect = false }
         } else if(data === 'error') {
           disconnectText.textContent = 'Socket error. Reloading the page may fix the problem.'
           disconnectText.style.color = 'rgb(255, 255, 255)'
@@ -276,7 +280,11 @@
         firstUpdate = false
       },
       announcement: function(data) {
-        render.addAnnouncement(data, 5000)
+        if(Array.isArray(data)) {
+          render.addAnnouncement(String(data[0]), Math.max(1000, Math.min(30000, Number(data[1]) || 5000)))
+        } else {
+          render.addAnnouncement(data, 5000)
+        }
       },
       gameStart: function(data) {
         gameData.me = false
@@ -468,7 +476,7 @@
         } else {
           str = data[0].slice(0, length - 1).join(', ') + ', and ' + data[0][length - 1]
         }
-        killer.textContent = 'Killed by ' + str
+        killer.textContent = data[3] ? String(data[3]) : 'Killed by ' + str
         game.respawnScore = data[1]
         respawnText.textContent = 'you will respawn at level ' + game.getLevel(data[1])
         deathRespawnAt.textContent = 'You will respawn at level ' + game.getLevel(data[1])

@@ -6,6 +6,7 @@ const url = require('url');
 const { Worker } = require('worker_threads');
 const { Accounts, achievements, SHA256, hashPassword, checkPassword, createAchievement, updateGallery } = require('./accounts.js');
 const words = require('./shared/words.js');
+const durations = require('./shared/durations.js');
 
 const commandDataPath = 'command-data.txt'
 const staffRoles = ['player', 'mod', 'admin', 'owner']

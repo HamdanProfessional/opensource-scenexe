@@ -352,7 +352,7 @@
         Detector.detectCollisions(objects, function(objectA, objectB, data) {
           dimension.collide(objectA, objectB, data)
         }, dim.mapSize)
-      } catch(e) { return dimension.antilag() }
+      } catch(e) { return dimension.collisionFailed(dim, e) }
       if(options.netUpdate && dim.spectators && dim.spectators.length) {
         for(let i=dim.spectators.length-1;i>=0;i--) {
           const s = dim.spectators[i]

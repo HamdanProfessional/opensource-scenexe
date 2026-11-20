@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Open-Scenexe Admin</title>
+<link rel="icon" type="image/svg+xml" href="/logo.svg">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700;900&display=swap">
+<link rel="stylesheet" href="/admin/admin.css">
+<script src="/admin/admin.js" defer></script>
+</head>
+<body>
+<main id="signin" class="signin" hidden>
+  <form id="signinForm" class="card">
+    <h1 class="title">Open-Scenexe</h1>
+    <h2>Staff Panel</h2>
+    <p class="muted">Sign in with your game account. Only staff can get in.</p>
+    <label>Username <input id="username" name="username" autocomplete="username" maxlength="30" required></label>
+    <label>Password <input id="password" name="password" type="password" autocomplete="current-password" maxlength="200" required></label>
+    <button type="submit">Sign in</button>
+    <p id="signinError" class="error" role="alert"></p>
+  </form>
+</main>
+
+<div id="app" hidden>
+  <header class="top">
+    <h1 class="title">Open-Scenexe</h1>
+    <h2 class="headerSub">Staff Panel</h2>
+    <span id="health" class="pill">...</span>
+    <span class="spacer"></span>
+    <span id="who" class="muted"></span>
+    <button id="signout" class="quiet">Sign out</button>
+  </header>
+
+  <p id="notice" class="notice" role="status" hidden></p>
+
+  <section>
+    <div class="cards">
+      <div class="card stat"><span class="muted">Players</span><strong id="statPlayers">-</strong><span id="statMenu" class="muted small"></span></div>
+      <div class="card stat"><span class="muted">CPU</span><strong id="statCpu">-</strong><span class="muted small">of one core</span></div>
+      <div class="card stat"><span class="muted">Memory</span><strong id="statMemory">-</strong><span class="muted small">whole server</span></div>
+      <div class="card stat"><span class="muted">Up for</span><strong id="statUptime">-</strong><span id="statLocked" class="muted small"></span></div>
+    </div>
+    <div class="card">
+      <div class="row"><h2>Tick time, last 20 minutes</h2><span class="muted small">A tick has 16.7 ms before the game slows down.</span></div>
+      <svg id="chart" class="chart" viewBox="0 0 720 200" role="img" aria-label="Tick time per dimension"></svg>
+      <div id="legend" class="legend"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Dimensions</h2>
+    <div class="scroll"><table id="dims"></table></div>
+    <p class="muted small">Paused dimensions have nobody in them and use no CPU.</p>
+  </section>
+
+  <section class="card">
+    <div class="row"><h2>Players</h2><input id="filter" class="filter" placeholder="Filter by name, account or dimension" aria-label="Filter players"></div>
+    <div class="scroll"><table id="players"></table></div>
+  </section>
+
+  <section class="card" id="announceBox" hidden>
+    <h2>Announce</h2>
+    <form id="announceForm" class="inline">
+      <input id="announceText" maxlength="200" placeholder="Shown to every player in every dimension" aria-label="Announcement" required>
+      <button type="submit">Send</button>
+    </form>
+  </section>
+
+  <section class="card" id="mutesBox">
+    <h2>Mutes</h2>
+    <div class="scroll"><table id="mutes"></table></div>
+  </section>
+
+  <section class="card" id="bansBox" hidden>
+    <h2>Bans</h2>
+    <form id="unbanForm" class="inline">
+      <input id="unbanKey" maxlength="100" placeholder="IP or banned name" aria-label="IP or banned name" required>
+      <button type="submit" class="quiet">Unban</button>
+    </form>
+    <div class="scroll"><table id="bans"></table></div>
+  </section>
+
+  <section class="card" id="rolesBox" hidden>
+    <h2>Staff roles</h2>
+    <form id="roleForm" class="inline">
+      <input id="roleAccount" maxlength="30" placeholder="Account name" aria-label="Account name" required>
+      <select id="roleValue" aria-label="Role">
+        <option value="">Just show it</option>
+        <option value="player">player</option>
+        <option value="mod">mod</option>
+        <option value="admin">admin</option>
+        <option value="owner">owner</option>
+      </select>
+      <button type="submit" class="quiet">Apply</button>
+    </form>
+    <p class="muted small">A new role applies when they rejoin or change dimension.</p>
+  </section>
+</div>
+
+<dialog id="confirm">
+  <form id="confirmForm" method="dialog">
+    <h2 id="confirmTitle"></h2>
+    <p id="confirmText"></p>
+    <label id="durationField">How long <input id="confirmDuration" maxlength="20" placeholder="30m, 2h, 7d or perm"></label>
+    <label id="reasonField">Reason <input id="confirmReason" maxlength="200" placeholder="Shown to them and in the logs"></label>
+    <label id="typeField">Type <b id="typeWord"></b> to confirm <input id="confirmType" maxlength="60" autocomplete="off"></label>
+    <div class="row end">
+      <button value="cancel" class="quiet" formnovalidate>Cancel</button>
+      <button id="confirmGo" value="go" class="danger">Confirm</button>
+    </div>
+  </form>
+</dialog>
+</body>
+</html>

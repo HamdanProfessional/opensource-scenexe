@@ -62,7 +62,7 @@
             let reload = barrel.data.reload * 0.5 * (1 - tank.upgrades[3] / 30) / bullet.parent.sReload
             let active
             if(barrel.data.type === 2 || barrel.data.type === 4) {
-              if(barrel.bullets.length >= barrel.data.drones * (1 + tank.upgrades[0] * 0.05666666667)) {
+              if(tank.droneCount >= dimension.maxDronesPerTank || barrel.bullets.length >= barrel.data.drones * (1 + tank.upgrades[0] * 0.05666666667)) {
                 active = false
               } else {
                 active = true

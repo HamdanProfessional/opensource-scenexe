@@ -15,3 +15,5 @@ Scenexe.zip
 .update-manifest
 discord-state.json
 native/build/
+banned.txt
+mutes.json

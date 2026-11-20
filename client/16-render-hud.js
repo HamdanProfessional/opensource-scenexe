@@ -181,6 +181,7 @@
       },
       drawBullet: function(bullet) {
         if(bullet.invisible) { return }
+        if(bullet.codeLook >= 0 && render.drawCodeBullet(bullet)) { return }
         if(!render.isPlainBullet(bullet)) {
           render.drawTank(bullet)
           return

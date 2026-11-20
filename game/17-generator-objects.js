@@ -49,14 +49,15 @@
           if(bullet === options.parent.bullets[bullet.id]) {
             delete options.parent.bullets[bullet.id]
           }
-          if(bullet.barrels) {
-            for(let i=bullet.barrels.length-1;i>=0;i--) {
-              let childArras = bullet.barrels[i].data.arras
-              if(childArras && childArras.persists) { continue }
-              let bullets = bullet.barrels[i].bullets
-              for(let u=bullets.length-1;u>=0;u--) {
-                bullets[u].remove()
-              }
+          if(bullet.type === 2 || bullet.type === 4) {
+            options.parent.droneCount --
+          }
+          for(let i=bullet._barrels.length-1;i>=0;i--) {
+            let childArras = bullet._barrels[i].data.arras
+            if(childArras && childArras.persists) { continue }
+            let bullets = bullet._barrels[i].bullets
+            for(let u=bullets.length-1;u>=0;u--) {
+              bullets[u].remove()
             }
           }
           let index = bullet.dim.bullets.indexOf(bullet)
@@ -165,6 +166,9 @@
       }
       b.bullets.push(bullet)
       options.parent.bullets[bullet.id] = bullet
+      if(bullet.type === 2 || bullet.type === 4) {
+        options.parent.droneCount ++
+      }
       if(bullet.dim) {
         bullet.dim.bullets.push(bullet)
       }

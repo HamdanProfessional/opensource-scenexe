@@ -612,7 +612,7 @@
           if(tank.invisible || !render.chat) {
             continue
           }
-          if(tank === gameData.me && render.typing && render.chatBox) {
+          if(render.chatBox && (tank === gameData.me && render.typing || !gameData.me && game.spectate && tank.id === game.spectate[0] && document.activeElement === chat)) {
             render.scaleFade(tank.fadeTime, false)
             render.chatBox.draw(tank, cameraSize)
             continue
@@ -986,7 +986,7 @@
             alpha = alpha * alpha
           }
           if(timeLeft <= 0) {
-            render.announcements.slice(i, 1)
+            render.announcements.splice(i, 1)
           } else {
             text.drawTextBox(announcement.text, 0, k + offsetY, 36, 1, alpha)
             k += 63 * alpha

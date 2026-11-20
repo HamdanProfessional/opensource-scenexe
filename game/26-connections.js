@@ -72,7 +72,7 @@
             return
           } else if(type === 'token') {
             return
-          } else if(!ws.data.ready) {
+          } else if(!ws.data.ready && !(type === 'chat' && ws.data.spectator && ws.data.spectator.staff)) {
             return
           } if(type === 'joinGame') {
             spectate.remove(ws)
@@ -194,6 +194,16 @@
               ws.data.tank.d = ((data[1] % 200 + 200) % 200) / 100 * Math.PI
             }
           } else if(type === 'chat') {
+            if(!ws.data.tank && ws.data.spectator && ws.data.spectator.staff) {
+              if(typeof data[1] === 'string' && data[1][0] === '/') {
+                const message = data[1].slice(0, 2000)
+                if(commands.asSpectator(ws, message) === true) {
+                  discordReport('commandLogs', `used a command while spectating (${ws.data.role})`, message.slice(0, 300), ws)
+                  commandLogs.write(['command used', ws.data.spectator.dim.name, ws.accountNameParsed, ws.data.role, message].join(' ') + '\n')
+                }
+              }
+              return
+            }
             if(!ws.data.tank || ws.data.tank.ws !== ws || typeof data[1] !== 'string') {
               return
             }
@@ -210,10 +220,10 @@
               if(ws.data.tank) {
                 let a = commands.execute(message.slice(0, 2000), ws.data.tank, ws)
                 if(a) {
-                  discordReport('commandLogs', `used a command (${ws.data.role})`, message.slice(0, 300), ws)
+                  if(a === true) { discordReport('commandLogs', `used a command (${ws.data.role})`, message.slice(0, 300), ws) }
                   commandLogs.write(['command used', ws.data.tank.dim ? ws.data.tank.dim.name : 'undefined', ws.accountNameParsed, ws.data.role, message].join(' ') + '\n')
                 }
-                if(a && ws.accountName) {
+                if(a === true && ws.accountName) {
                   ws.accountName = false
                   ws.accountData = false
                   ws.sendPacket('announcement', 'Alert: You can no longer earn achievements and this run won\'t be saved!')

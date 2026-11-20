@@ -20,6 +20,7 @@ const mhtml = function(s) {
 }
 
 const JSON_tankData = JSON.stringify(tankData)
+const tankCodes = require('./shared/tank-code.js').folder('./tankData/codes')
 const JSON_achievements = JSON.stringify(require('./shared/achievements.js'))
 
 const clientSource = function() { return require('./lib/parts.js').join(require('path').join(__dirname, 'client')) }

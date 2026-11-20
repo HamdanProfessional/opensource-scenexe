@@ -234,7 +234,7 @@
           body = tankData.bodies.base
         }
         const part = function(n, def) { return n && n[0] ? (n[0] === '@' ? (def && def.name) || 'Custom' : n[0].toUpperCase() + n.slice(1)) : '???' }
-        let upgrade = `${part(tank.weapon, tankData.weapons[tank.weapon])}-${part(tank.body, tankData.bodies[tank.body])}`
+        let upgrade = body.code && body.name ? body.name : `${part(tank.weapon, tankData.weapons[tank.weapon])}-${part(tank.body, tankData.bodies[tank.body])}`
         if(tank.radiant > 0) {
           tank.className = render.getRadiantName(tank.radiant) + ' ' + upgrade
         } else {
@@ -264,6 +264,7 @@
         tank._turrets = []
         tank._barrels = []
         tank.visualElements = body.visualElements || []
+        tank.code = body.code || null
         tank.weaponVisualElements = weapon.weaponVisualElements || []
         let id = 0
         let _id = 0

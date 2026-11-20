@@ -247,7 +247,7 @@ server.on("connection", (ws, request) => {
         return
       } else if(ws.fsocket && ws.fsocket.readyState === 1) {
         if(type === 'chat') {
-          let str = data[1]
+          let str = typeof data[1] === 'string' ? data[1] : ''
           if(str[0] === '/') {
             let k = str.slice(1).split(' ')
             let j = k.splice(0, 1)[0]
@@ -302,6 +302,12 @@ server.on("connection", (ws, request) => {
                   }
                 }, 1000)
               }
+              return
+            }
+          } else if(str.trim()) {
+            const mute = mutes.of(ws)
+            if(mute) {
+              ws.sendPacket('announcement', mutes.describe(mute))
               return
             }
           }

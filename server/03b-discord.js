@@ -316,7 +316,11 @@ const discordBot = (function() {
     })
   }
 
-  const api = { send, clean, code, player, ip, duration, dimLabel, fromWorker, shutdown }
+  const has = function(channel) {
+    return !!settings.channels[channel]
+  }
+
+  const api = { send, has, clean, code, player, ip, duration, dimLabel, fromWorker, shutdown }
   if(!Discord) { return api }
 
   const { Client, GatewayIntentBits, Partials, Events, SlashCommandBuilder, PermissionFlagsBits, MessageFlags, ChannelType } = Discord
@@ -397,9 +401,20 @@ const discordBot = (function() {
         .addStringOption(o => o.setName('player').setDescription('Player or account name').setRequired(true).setAutocomplete(true)))
       .addSubcommand(s => s.setName('ban').setDescription('Ban a player\'s IP from the game')
         .addStringOption(o => o.setName('player').setDescription('Player or account name').setRequired(true).setAutocomplete(true))
-        .addStringOption(o => o.setName('reason').setDescription('Why')))
+        .addStringOption(o => o.setName('duration').setDescription('How long, like 30m, 2h or 7d (empty means permanent)').setMaxLength(20))
+        .addStringOption(o => o.setName('reason').setDescription('Why').setMaxLength(200)))
       .addSubcommand(s => s.setName('unban').setDescription('Remove a game ban')
         .addStringOption(o => o.setName('target').setDescription('IP or banned name').setRequired(true)))
+      .addSubcommand(s => s.setName('bans').setDescription('List game bans'))
+      .addSubcommand(s => s.setName('mute').setDescription('Stop a player from chatting in game')
+        .addStringOption(o => o.setName('player').setDescription('Player or account name').setRequired(true).setAutocomplete(true))
+        .addStringOption(o => o.setName('duration').setDescription('How long, like 30m, 2h or perm (default 10m)').setMaxLength(20))
+        .addStringOption(o => o.setName('reason').setDescription('Why').setMaxLength(200)))
+      .addSubcommand(s => s.setName('unmute').setDescription('Let a muted player chat again')
+        .addStringOption(o => o.setName('target').setDescription('Player name, account or IP').setRequired(true)))
+      .addSubcommand(s => s.setName('mutes').setDescription('List muted players'))
+      .addSubcommand(s => s.setName('whois').setDescription('Show a player\'s account, IP and time in game')
+        .addStringOption(o => o.setName('player').setDescription('Player or account name').setRequired(true).setAutocomplete(true)))
       .addSubcommand(s => s.setName('role').setDescription('Show or set an account\'s staff role')
         .addStringOption(o => o.setName('account').setDescription('Account name').setRequired(true))
         .addStringOption(o => o.setName('role').setDescription('New role').addChoices(...staffRoles.map(r => ({ name: r, value: r })))))
@@ -446,6 +461,13 @@ const discordBot = (function() {
       .addChannelOption(o => o.setName('channel').setDescription('Channel (default: this one)').addChannelTypes(ChannelType.GuildText))
   ]
 
+  const readDuration = function(interaction) {
+    const text = interaction.options.getString('duration')
+    if(!text) { return null }
+    const ms = durations.parse(text)
+    return ms === null ? false : ms
+  }
+
   const gameCommands = {
     announce: function(interaction) {
       const text = interaction.options.getString('message')
@@ -463,11 +485,44 @@ const discordBot = (function() {
     ban: function(interaction) {
       const found = findPlayer(interaction.options.getString('player'))
       if(found.error) { return found.error }
+      const ms = readDuration(interaction)
+      if(ms === false) { return 'Use a time like 30m, 2h or 7d, or leave it empty for a permanent ban.' }
       let note = ''
       const name = found.client.accountName || found.client.data.name
-      staffAction('ban', [found.client.data.id, actor(interaction), name], function(t) { note = t })
-      const reason = interaction.options.getString('reason')
-      if(reason) { send('gameLogs', `Ban reason for ${clean(name, 50)}: ${code(reason)}`) }
+      staffAction('ban', [found.client.data.id, actor(interaction), name, ms, interaction.options.getString('reason')], function(t) { note = t })
+      return note
+    },
+    bans: function(interaction) {
+      let note = ''
+      staffAction('bans', [actor(interaction)], function(t) { note = t })
+      return note
+    },
+    mute: function(interaction) {
+      const found = findPlayer(interaction.options.getString('player'))
+      if(found.error) { return found.error }
+      const ms = readDuration(interaction)
+      if(ms === false) { return 'Use a time like 30m, 2h or perm, or leave it empty for 10 minutes.' }
+      let note = ''
+      staffAction('mute', [found.client.data.id, actor(interaction), ms, interaction.options.getString('reason'), found.client.data.name], function(t) { note = t })
+      return note
+    },
+    unmute: function(interaction) {
+      const target = interaction.options.getString('target')
+      const found = findPlayer(target)
+      let note = ''
+      staffAction('unmute', [target, actor(interaction), found.client ? found.client.data.id : -1], function(t) { note = t })
+      return note
+    },
+    mutes: function(interaction) {
+      let note = ''
+      staffAction('mutes', [actor(interaction), true], function(t) { note = t })
+      return note
+    },
+    whois: function(interaction) {
+      const found = findPlayer(interaction.options.getString('player'))
+      if(found.error) { return found.error }
+      let note = ''
+      staffAction('whois', [found.client.data.id, actor(interaction), null, true], function(t) { note = t })
       return note
     },
     unban: function(interaction) {

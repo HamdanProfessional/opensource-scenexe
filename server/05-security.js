@@ -1,4 +1,4 @@
-let banned = {}
+let banned = {}, banDetails = {}
 const bannedPath = './banned.txt'
 
 const readBans = function() {
@@ -11,17 +11,51 @@ const writeBans = function(lines) {
   fetchBanned()
 }
 
+const parseBan = function(line) {
+  const fields = line.split('\t'), head = fields[0], space = head.indexOf(' ')
+  const until = fields[1] ? Date.parse(fields[1]) : NaN
+  return {
+    ip: space < 0 ? head : head.slice(0, space),
+    name: space < 0 ? '' : head.slice(space + 1),
+    until: until > 0 ? until : 0,
+    reason: fields[2] || '',
+    by: fields[3] || ''
+  }
+}
+
+const formatBan = function(ban) {
+  const tidy = function(text, max) {
+    return String(text || '').replace(/\s+/g, ' ').trim().slice(0, max)
+  }
+  const name = tidy(ban.name, 50)
+  return [ban.ip + (name ? ' ' + name : ''), ban.until ? new Date(ban.until).toISOString() : 'never', tidy(ban.reason, 200), tidy(ban.by, 60)].join('\t')
+}
+
+const banMessage = function(ban) {
+  let text = ban && ban.until ? `Banned for ${durations.format(ban.until - Date.now())}` : 'Banned'
+  return ban && ban.reason ? `${text}: ${ban.reason}` : text
+}
+
 let fetchBanned = function() {
   try {
-    let nbanned = {}
-    for(const line of readBans()) {
-      nbanned[line.split(' ')[0]] = true
+    const now = Date.now(), lines = readBans(), live = []
+    let nbanned = {}, details = {}
+    for(const line of lines) {
+      const ban = parseBan(line)
+      if(ban.until && ban.until <= now) { continue }
+      live.push(line)
+      nbanned[ban.ip] = true
+      details[ban.ip] = ban
+    }
+    if(live.length < lines.length) {
+      fs.writeFileSync(bannedPath, live.join('\n') + (live.length ? '\n' : ''))
     }
     banned = nbanned
+    banDetails = details
     for(let i=clients.length-1;i>=0;i--) {
       let c = clients[i]
       if(banned[c._ip] === true) {
-        c.sendPacket('flag', 'banned')
+        c.sendPacket('flag', ['banned', banMessage(banDetails[c._ip])])
         c.sendPacket = function() {}
         c.send = function() {}
         c.close()

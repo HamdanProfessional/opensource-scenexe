@@ -170,7 +170,7 @@
         let viewObject = tank.viewObject = tank.viewObject || {}
         viewObject.x = tank.x
         viewObject.y = tank.y
-        viewObject.size = tank.size * 1.5 + 200
+        viewObject.size = tank.size * (tank.codeState ? Math.max(1.5, tank.codeState.reach) : 1.5) + 200
         viewObject.object = tank
         viewObject.type = 'bullet'
         viewObject.str = 'tanks'

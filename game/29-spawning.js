@@ -200,14 +200,19 @@
     }, [sides, radiant])
   }
 
+  const loopDelay = require('perf_hooks').monitorEventLoopDelay({ resolution: 10 })
+  loopDelay.enable()
   setInterval(function() {
     let c = {}
     for(let n in dimension.dims) {
       let d = dimension.dims[n]
-      c[n] = [d.playerCount(), d.getTickrate(), d.getTickTime(), d.getUpdateTime(), d.getObjectLength(), d.tanks.length, d.bullets.length, d.polygons.length]
+      const owners = dimension.bulletOwners(d).slice(0, 3).map(e => [String(e[0].name || 'unnamed').slice(0, 30), e[1]])
+      c[n] = [d.playerCount(), d.getTickrate(), d.getTickTime(), d.getUpdateTime(), d.getObjectLength(), d.tanks.length, d.bullets.length, d.polygons.length, d.paused ? 0 : d.workAvg || 0, d.statsPeak || 0, d.paused ? 0 : d.netAvg || 0, owners, !!d.paused]
+      d.statsPeak = 0
     }
-
-    args.parentPort.postMessage(['dimStats', c])
+    const info = { heap: require('v8').getHeapStatistics().used_heap_size, loopP99: loopDelay.percentile(99) / 1e6, loopMax: loopDelay.max / 1e6 }
+    loopDelay.reset()
+    args.parentPort.postMessage(['dimStats', c, info])
   }, 3000)
 
   return { game, dimension, packer, net, generator, Detector, View, httpServer, server, commands, addBot }

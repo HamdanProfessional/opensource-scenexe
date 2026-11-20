@@ -193,6 +193,7 @@
           let turret = tank._turrets[u]
           dimension.updateTurret(turret, tank, tank)
         }
+        codeTanks.update(tank)
         for(let u=0,k=tank.auras.length;u<k;u++) {
           let aura = tank.auras[u]
           let m = (1 + tank.upgrades[3] / 15) * tank.sReload * (1 + tank.upgrades[2] / 15) * tank.sBulletDamage * (1 + tank.upgrades[0] / 15)
@@ -245,7 +246,7 @@
             active = ((barrel.turret.followingMouse || barrel.turret.detector.closest) ? barrel.turret.active : false)
           }
           if(barrel.data.type === 2 || barrel.data.type === 4) {
-            if(barrel.bullets.length >= barrel.data.drones * (1 + tank.upgrades[0] / 30)) {
+            if(tank.droneCount >= dimension.maxDronesPerTank || barrel.bullets.length >= barrel.data.drones * (1 + tank.upgrades[0] / 30)) {
               active = false
             } else {
               active = tank.passive ? tank.firing : true

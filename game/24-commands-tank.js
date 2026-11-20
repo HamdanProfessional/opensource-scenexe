@@ -250,31 +250,68 @@
       ],
       kick: [
         [['targets'], function(data, tank, ws) {
-          let n = 0
-          for(const t of data[0]) {
-            if(t.ws && t.ws.data && t.ws.data.isPlayer && t.ws.data.uid >= 0 && t !== tank) {
-              args.parentPort.postMessage(['kick', [t.ws.data.uid, ws.data.uid]])
-              n ++
-            }
-          }
-          ws.sendPacket('announcement', n ? `Kicked ${n} player${n > 1 ? 's' : ''}.` : 'No players to kick there.')
+          commands.kick(data[0], tank, ws, '')
+        }],
+        [['targets', '*'], function(data, tank, ws) {
+          commands.kick(data[0], tank, ws, data[1])
         }]
       ],
       ban: [
         [['targets'], function(data, tank, ws) {
-          let n = 0
-          for(const t of data[0]) {
-            if(t.ws && t.ws.data && t.ws.data.isPlayer && t.ws.data.uid >= 0 && t !== tank) {
-              args.parentPort.postMessage(['ban', [t.ws.data.uid, ws.data.uid, t.name]])
-              n ++
-            }
-          }
-          if(!n) { ws.sendPacket('announcement', 'No players to ban there.') }
+          commands.ban(data[0], tank, ws, '')
+        }],
+        [['targets', '*'], function(data, tank, ws) {
+          commands.ban(data[0], tank, ws, data[1])
         }]
       ],
       unban: [
         [['string'], function(data, tank, ws) {
-          args.parentPort.postMessage(['unban', [data[0], ws.data.uid]])
+          commands.toServer(ws, 'unban', [data[0], ws.data.uid])
+        }]
+      ],
+      bans: [
+        [[], function(data, tank, ws) {
+          commands.toServer(ws, 'bans', [ws.data.uid])
+        }]
+      ],
+      mute: [
+        [['targets'], function(data, tank, ws) {
+          commands.mute(data[0], tank, ws, '')
+        }],
+        [['targets', '*'], function(data, tank, ws) {
+          commands.mute(data[0], tank, ws, data[1])
+        }]
+      ],
+      unmute: [
+        [['*'], function(data, tank, ws) {
+          let found = commands.getTargets(data[0], tank) || [], t = found.length === 1 ? found[0] : false
+          let uid = t && t.ws && t.ws.data && t.ws.data.isPlayer && t.ws.data.uid >= 0 ? t.ws.data.uid : -1
+          commands.toServer(ws, 'unmute', [data[0], ws.data.uid, uid])
+        }]
+      ],
+      mutes: [
+        [[], function(data, tank, ws) {
+          commands.toServer(ws, 'mutes', [ws.data.uid, commands.level(ws.data.role) >= commands.level('admin')])
+        }]
+      ],
+      perf: [
+        [[], function(data, tank, ws) {
+          commands.toServer(ws, 'perf', [ws.data.uid])
+        }]
+      ],
+      whois: [
+        [['targets'], function(data, tank, ws) {
+          commands.whois(data[0], tank, ws)
+        }]
+      ],
+      spectate: [
+        [['targets'], function(data, tank, ws) {
+          commands.spectate(data[0], tank, ws)
+        }]
+      ],
+      report: [
+        [['string', '*'], function(data, tank, ws) {
+          commands.report(data[0], data[1], tank, ws)
         }]
       ],
       role: [

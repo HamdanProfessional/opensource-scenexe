@@ -9,6 +9,17 @@
           commands.spawnBoss(tank, ws, data[0], data[1])
         }]
       ],
+      tankcode: [
+        [[], function(data, tank, ws) {
+          commands.listCodes(tank, ws)
+        }],
+        [['string'], function(data, tank, ws) {
+          commands.becomeCode([tank], ws, data[0])
+        }],
+        [['targets', 'string'], function(data, tank, ws) {
+          commands.becomeCode(data[0], ws, data[1])
+        }]
+      ],
       becomeboss: [
         [['string'], function(data, tank, ws) {
           commands.becomeBoss([tank], ws, data[0])

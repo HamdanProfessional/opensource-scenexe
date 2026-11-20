@@ -377,7 +377,9 @@
         darknessUpdated: -1,
         fov: { tanks: dim.tanks, bullets: [], polygons: [] },
         fovVisible: null,
-        fovObject: false
+        fovObject: false,
+        staff: false,
+        follow: -1
       }
       ws.data.spectator = s
       dim.spectators.push(s)
@@ -395,6 +397,15 @@
       return (t.objectType === 'tank' ? s.dim.tanks : s.dim.polygons).indexOf(t) >= 0
     },
     follow: function(s) {
+      if(s.follow >= 0 && !(spectate.alive(s) && s.target.ws && s.target.ws.data && s.target.ws.data.uid === s.follow)) {
+        for(let i=s.dim.tanks.length-1;i>=0;i--) {
+          const t = s.dim.tanks[i]
+          if(t.ws && t.ws.data && t.ws.data.uid === s.follow) {
+            s.target = t
+            break
+          }
+        }
+      }
       if(!spectate.alive(s)) {
         let best = false
         for(let i=s.dim.tanks.length-1;i>=0;i--) {

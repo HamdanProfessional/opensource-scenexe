@@ -16,6 +16,7 @@ const native = (function() {
 })()
 
 const words = require('./shared/words.js')
+const durations = require('./shared/durations.js')
 const checkName = function(str) {
   return !words.isBad(str)
 }

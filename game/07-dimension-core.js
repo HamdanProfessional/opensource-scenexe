@@ -1,6 +1,7 @@
   const TICK_RATE = (args && args.tickRate > 0) ? Number(args.tickRate) : 60
   const dimension = {
     clipSize: 100,
+    maxDronesPerTank: 200,
     tickRate: TICK_RATE,
     tickTime: 1 / TICK_RATE,
     tickMs: 1000 / TICK_RATE,
@@ -59,22 +60,80 @@
       }
       return `Success: Loaded ${a.length} walls`
     },
-    antilag: function() {
-      for(let n in dimension.dims) {
-        let dim = dimension.dims[n], tanks = dim.tanks
-        for(let i=tanks.length-1;i>=0;i--) {
-          let t = tanks[i]
-          if(!t.static && !t.ws.data.isPlayer) {
+    bulletOwner: function(bullet) {
+      let owner = bullet.parent
+      for(let k=0;k<10 && owner && owner.parent && owner.parent !== owner;k++) { owner = owner.parent }
+      return owner || false
+    },
+    bulletOwners: function(dim) {
+      let counts = new Map()
+      for(let i=dim.bullets.length-1;i>=0;i--) {
+        let owner = dimension.bulletOwner(dim.bullets[i])
+        if(owner) { counts.set(owner, (counts.get(owner) || 0) + 1) }
+      }
+      return [...counts].sort(function(a, b) { return b[1] - a[1] })
+    },
+    isPlayer: function(tank) {
+      return !!(tank && tank.ws && tank.ws.data && tank.ws.data.isPlayer)
+    },
+    antilag: function(dim, full) {
+      let result = { full: !!full, trimmed: [], bullets: 0, bots: 0, shapes: 0 }
+      let before = dim.bullets.length
+      if(full) {
+        for(let i=dim.tanks.length-1;i>=0;i--) {
+          let t = dim.tanks[i]
+          if(!t.static && !dimension.isPlayer(t)) {
             t.remove()
+            result.bots ++
           }
         }
-        for(let i=dim.tanks.length-1;i>=0;i--) {
-          dim.tanks[i].removeBullets()
+        let list = dim.bullets.slice()
+        for(let i=list.length-1;i>=0;i--) { list[i].remove() }
+        let extra = dim.polygons.length - Math.max(0, Math.floor(dim.maxPolygonCount) || 0)
+        if(extra > 0) {
+          let oldest = dim.polygons.slice(0, extra)
+          for(let i=oldest.length-1;i>=0;i--) { oldest[i].remove() }
+          result.shapes = extra
         }
-        for(let i=dim.polygons.length-1;i>=0;i--) {
-          dim.polygons[i].remove()
+        let now = Date.now()
+        if(!(now - dim.antilagNoticeAt < 10000)) {
+          dim.antilagNoticeAt = now
+          for(let i=dim.tanks.length-1;i>=0;i--) {
+            let t = dim.tanks[i]
+            if(dimension.isPlayer(t) && t.ws.sendPacket) {
+              t.ws.sendPacket('announcement', 'The server was lagging, so bullets and bots here were cleared.')
+            }
+          }
+        }
+      } else {
+        let chosen = new Set()
+        for(const [owner, count] of dimension.bulletOwners(dim)) {
+          if(chosen.size >= 3 || count < 20) { break }
+          chosen.add(owner)
+          result.trimmed.push([owner.name || (dimension.isPlayer(owner) ? 'unnamed' : 'a bot'), count])
+        }
+        let list = dim.bullets.slice()
+        for(let i=list.length-1;i>=0;i--) {
+          if(chosen.has(dimension.bulletOwner(list[i]))) { list[i].remove() }
+        }
+        for(const owner of chosen) {
+          if(dimension.isPlayer(owner) && owner.ws.sendPacket) {
+            owner.ws.sendPacket('announcement', 'The server was lagging, so your bullets were cleared.')
+          }
         }
       }
+      result.bullets = before - dim.bullets.length
+      return result
+    },
+    collisionFailed: function(dim, error) {
+      let now = Date.now()
+      if(!(now - dim.collisionErrorAt < 10000)) {
+        dim.collisionErrorAt = now
+        let text = `antilag: the collision check failed in ${dim.name} (${error && error.message || error}), so its bullets and bots were cleared`
+        console.log(text)
+        if(args.parentPort && !args.standalone) { args.parentPort.postMessage(['antilag', text]) }
+      }
+      dimension.antilag(dim, true)
     },
 	findClosestTank: function(x, y, tanks) {
 		let closest = false, tank = false

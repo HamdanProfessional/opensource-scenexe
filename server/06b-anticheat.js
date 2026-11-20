@@ -146,10 +146,28 @@ const anticheat = (function() {
     return true
   }
 
+  const list = function() {
+    const now = Date.now(), out = []
+    for(const key in bans) {
+      if(bans[key] > now) { out.push([key, bans[key]]) }
+    }
+    return out
+  }
+
+  const unban = function(ip) {
+    const key = ipGroup(String(ip))
+    if(!bans[key]) { return false }
+    delete bans[key]
+    delete kicks[key]
+    return true
+  }
+
   return {
     settings: settings,
     isBanned: isBanned,
     ban: ban,
+    list: list,
+    unban: unban,
     log: log,
     canConnect: function(ip) {
       if(isBanned(ip)) { return 'banned' }
