@@ -112,13 +112,7 @@ static uint32_t hash_group(int32_t parent, double key)
   } else {
     memcpy(&bits, &key, sizeof bits);
   }
-  bits ^= (uint64_t)(uint32_t)parent * 0x9e3779b97f4a7c15ULL;
-  bits ^= bits >> 33;
-  bits *= 0xff51afd7ed558ccdULL;
-  bits ^= bits >> 33;
-  bits *= 0xc4ceb9fe1a85ec53ULL;
-  bits ^= bits >> 33;
-  return (uint32_t)bits;
+  return (uint32_t)mix64(bits ^ (uint64_t)(uint32_t)parent * 0x9e3779b97f4a7c15ULL);
 }
 
 static int32_t group_of(int32_t *table, uint32_t mask, group_t *groups, int32_t *group_count, int32_t parent, double value, int32_t position)
@@ -152,50 +146,20 @@ static double order_key(const group_t *g)
   return 4294967296.0 + (double)g->first;
 }
 
-static int compare(const sort_context_t *context, int32_t a, int32_t b)
+static int order_less(const void *data, uint32_t a, uint32_t b)
 {
+  const sort_context_t *context = (const sort_context_t *)data;
   int level;
   for(level = 0; level < context->levels; level++) {
     double x = context->order[(size_t)a * LEVELS + level], y = context->order[(size_t)b * LEVELS + level];
     if(x < y) {
-      return -1;
-    }
-    if(x > y) {
       return 1;
     }
-  }
-  return a < b ? -1 : a > b;
-}
-
-static void merge_sort(int32_t *items, int32_t *work, size_t count, const sort_context_t *context)
-{
-  size_t width, i;
-  int32_t *source = items, *target = work, *swap;
-  for(width = 1; width < count; width *= 2) {
-    for(i = 0; i < count; i += 2 * width) {
-      size_t left = i, middle = i + width < count ? i + width : count, end = i + 2 * width < count ? i + 2 * width : count;
-      size_t right = middle, k = i;
-      while(left < middle && right < end) {
-        if(compare(context, source[right], source[left]) < 0) {
-          target[k++] = source[right++];
-        } else {
-          target[k++] = source[left++];
-        }
-      }
-      while(left < middle) {
-        target[k++] = source[left++];
-      }
-      while(right < end) {
-        target[k++] = source[right++];
-      }
+    if(x > y) {
+      return 0;
     }
-    swap = source;
-    source = target;
-    target = swap;
   }
-  if(source != items) {
-    memcpy(items, source, count * sizeof(int32_t));
-  }
+  return a < b;
 }
 
 static void put_bullet(writer_t *w, const double *row, const double *turrets)
@@ -223,7 +187,7 @@ static void put_polygon(writer_t *w, const double *row)
   }
 }
 
-static size_t run_end(const int32_t *items, const int32_t *group, size_t from, size_t count)
+static size_t run_end(const uint32_t *items, const int32_t *group, size_t from, size_t count)
 {
   size_t end = from + 1;
   while(end < count && group[items[end]] == group[items[from]]) {
@@ -235,7 +199,8 @@ static size_t run_end(const int32_t *items, const int32_t *group, size_t from, s
 napi_value js_encode(napi_env env, napi_callback_info info)
 {
   args_t a;
-  int32_t kind, count, *rows, group_count = 0, *table = NULL, *items, *work, *level_group[LEVELS];
+  int32_t kind, count, *rows, group_count = 0, *table = NULL, *level_group[LEVELS];
+  uint32_t *items, *work;
   double *wire, *turrets, *order;
   uint8_t *out;
   size_t wire_length, turret_length, out_length, capacity = 2, i, block;
@@ -250,9 +215,6 @@ napi_value js_encode(napi_env env, napi_callback_info info)
   }
   kind = args_int(&a, 0);
   count = args_int(&a, 1);
-  if(a.failed) {
-    return NULL;
-  }
   if((kind != 1 && kind != 2) || count < 0 || count > (1 << 24)) {
     return args_fail(&a, "bad encode arguments");
   }
@@ -288,9 +250,9 @@ napi_value js_encode(napi_env env, napi_callback_info info)
   table = (int32_t *)memory;
   groups = (group_t *)(memory + capacity * sizeof(int32_t));
   order = (double *)((char *)groups + (size_t)count * levels * sizeof(group_t));
-  items = (int32_t *)((char *)order + (size_t)count * LEVELS * sizeof(double));
+  items = (uint32_t *)((char *)order + (size_t)count * LEVELS * sizeof(double));
   work = items + count;
-  level_group[0] = work + count;
+  level_group[0] = (int32_t *)(work + count);
   level_group[1] = level_group[0] + count;
   level_group[2] = level_group[1] + count;
   memset(table, 0, capacity * sizeof(int32_t));
@@ -305,11 +267,11 @@ napi_value js_encode(napi_env env, napi_callback_info info)
       order[i * LEVELS + level] = order_key(groups + g);
       parent = g;
     }
-    items[i] = (int32_t)i;
+    items[i] = (uint32_t)i;
   }
   context.order = order;
   context.levels = levels;
-  merge_sort(items, work, (size_t)count, &context);
+  sort_items(items, work, (size_t)count, order_less, &context);
 
   w.data = out;
   w.capacity = out_length;

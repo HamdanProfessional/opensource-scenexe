@@ -6,6 +6,19 @@ const path = require('path')
 const zlib = require('zlib')
 const { root, tankCode, encode, realCode, barrel, section, polygon } = require('./helpers.js')
 
+const walk = function(list, visit) {
+  for(const n of list) {
+    visit(n)
+    if(n.children) { walk(n.children, visit) }
+  }
+}
+
+const synced = function(tank) {
+  const out = []
+  walk(tank.render, n => { if(n.sync !== undefined) { out.push(n.sync) } })
+  return out
+}
+
 test('decodes msgpack and JSON codes', () => {
   const tank = { name: 'Small', render: [polygon()] }
   assert.deepStrictEqual(tankCode.decode(encode(tank)), tank)
@@ -34,8 +47,9 @@ test('refuses codes that inflate past the size limit', () => {
 test('loads the Unknow Remaster code', () => {
   const tank = tankCode.load(realCode())
   assert.strictEqual(tank.name, 'Unknow remaster ( fix )')
-  assert.deepStrictEqual(tank.counts, { parts: 1361, firing: 92, synced: 13, looks: 5 })
   assert.strictEqual(tank.shots.length, 92)
+  assert.strictEqual(tank.looks.length, 5)
+  assert.strictEqual(synced(tank).length, 13)
   assert.deepStrictEqual(tank.changed, [])
   assert.ok(tank.reach > 2.7 && tank.reach < 2.8, String(tank.reach))
   const kinds = {}
@@ -80,13 +94,17 @@ test('a missing outline width means the default and 0 means none', () => {
   assert.deepStrictEqual(tank.render.map(n => n.lineWidth), [-1, 0, 3])
 })
 
-test('only spinning and auto sections with firing barrels are synced', () => {
+test('only spinning and auto sections with firing barrels or damaging auras are synced', () => {
   const tank = tankCode.load({
     render: [
       section('constant', [barrel(0)]),
       section('constant', [barrel(0, { data: { visualOnly: 1 } })]),
       section('mouse', [barrel(0)]),
-      section('fixed', [section('auto', [barrel(5)])])
+      section('fixed', [section('auto', [barrel(5)])]),
+      section('constant', [{ type: 'scenexe-aura', auraSize: 2, auraDamage: 1 }]),
+      section('constant', [{ type: 'scenexe-aura', auraSize: 2 }]),
+      section('auto', [polygon()]),
+      section('fixed', [{ type: 'scenexe-aura', auraSize: 2, auraDamage: 1 }])
     ]
   })
   const sections = tank.render.filter(n => n.t === 'section')
@@ -95,7 +113,10 @@ test('only spinning and auto sections with firing barrels are synced', () => {
   assert.strictEqual(sections[2].sync, undefined)
   assert.strictEqual(sections[3].sync, undefined)
   assert.strictEqual(sections[3].children[0].sync, 1)
-  assert.strictEqual(tank.counts.synced, 2)
+  assert.strictEqual(sections[4].sync, 2)
+  assert.strictEqual(sections[5].sync, undefined)
+  assert.strictEqual(sections[6].sync, undefined)
+  assert.strictEqual(sections[7].sync, undefined)
   assert.deepStrictEqual(tank.shots.map(s => s.kind), ['bullet', 'bullet', 'drone'])
 })
 
@@ -116,7 +137,7 @@ test('firing barrels past the limit are kept as drawings', () => {
   const many = []
   for(let i = 0; i < tankCode.LIMITS.firing + 5; i++) { many.push(barrel(0)) }
   const tank = tankCode.load({ render: many })
-  assert.strictEqual(tank.counts.firing, tankCode.LIMITS.firing)
+  assert.strictEqual(tank.shots.length, tankCode.LIMITS.firing)
   assert.strictEqual(tank.render.filter(n => n.visual).length, 5)
   assert.ok(tank.changed.some(c => c.includes('firing barrels past')), tank.changed.join())
 })
@@ -129,7 +150,7 @@ test('deep nesting and huge part counts are cut off', () => {
   const flood = []
   for(let i = 0; i < tankCode.LIMITS.nodes + 50; i++) { flood.push(polygon()) }
   const big = tankCode.load({ render: flood })
-  assert.strictEqual(big.counts.parts, tankCode.LIMITS.nodes)
+  assert.strictEqual(big.render.length, tankCode.LIMITS.nodes)
   assert.ok(big.changed.some(c => c.includes('parts past')), big.changed.join())
 })
 
@@ -145,10 +166,33 @@ test('drones per barrel and odd numbers are clamped', () => {
 test('bullet looks are shared and never fire', () => {
   const look = { render: [polygon(), barrel(0), { type: 'scenexe-aura', auraSize: 2, auraDamage: 1 }] }
   const tank = tankCode.load({ render: [barrel(3, { data: { bulletCode: look } }), barrel(5, { data: { bulletCode: look } })] })
-  assert.strictEqual(tank.counts.looks, 1)
+  assert.strictEqual(tank.looks.length, 1)
   assert.deepStrictEqual(tank.shots.map(s => s.look), [0, 0])
   assert.ok(tank.looks[0].filter(n => n.t === 'barrel').every(n => n.visual))
-  assert.strictEqual(tank.counts.firing, 2)
+  assert.strictEqual(tank.shots.length, 2)
+})
+
+test('missing numbers and colours fall back instead of becoming 0', () => {
+  const tank = tankCode.load({
+    data: { maxHealth: null, movementSpeed: '', bodyDamage: false, color: null },
+    render: [polygon({ polygonData: { sides: 0, size: null, x: false } }), barrel(0, { w: '', data: { reload: null } })]
+  })
+  assert.deepStrictEqual(tank.stats, { maxHealth: 100, bodyDamage: 10, movementSpeed: 50, cameraSize: 10 })
+  assert.strictEqual(tank.color, 0x383838)
+  assert.strictEqual(tank.render[0].size, 1)
+  assert.strictEqual(tank.render[0].x, 0)
+  assert.strictEqual(tank.render[1].w, 0.5)
+  assert.strictEqual(tank.render[1].reload, 1)
+})
+
+test('a stat set to 0 stays 0', () => {
+  const tank = tankCode.load({ data: { movementSpeed: 0 }, render: [polygon()] })
+  assert.strictEqual(tank.stats.movementSpeed, 0)
+})
+
+test('gradient stops are always numbers', () => {
+  const tank = tankCode.load({ render: [polygon({ gradient: { colors: [{ value: 0, color: 'inherit' }, { value: 1, color: 0xff0000 }, { value: 0.5 }] } })] })
+  assert.deepStrictEqual(tank.render[0].gradient, [[0, 0], [1, 0xff0000], [0.5, 0]])
 })
 
 test('the client copy has no gameplay numbers', () => {
@@ -197,6 +241,7 @@ test('every code file becomes a body and weapon', () => {
   assert.strictEqual(body.code, 'unknow-remaster')
   assert.strictEqual(body.name, 'Unknow remaster ( fix )')
   assert.strictEqual(body.maxHealth, 10)
+  assert.strictEqual(body.movementSpeed, 1)
   assert.ok(tankData.weapons['code:unknow-remaster'])
   assert.strictEqual(tankData.bodies['boss:unknow'].code, 'unknow-remaster')
   const codes = tankCode.folder(path.join(root, 'tankData/codes'))

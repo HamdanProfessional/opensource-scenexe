@@ -1,3 +1,12 @@
+  const hasEntries = function(object) {
+    for(let key in object) { return true }
+    return false
+  }
+  const angleStep = function(angle, half) {
+    const steps = half * 2
+    return (Math.round(angle / Math.PI * half) % steps + steps) % steps
+  }
+
   const net = (function() {
     const c = Object.assign({
       sendRate: 30,
@@ -26,11 +35,14 @@
       seqTime: sendTicks / tickRate,
       bulletMotion: function(b) {
         if(b.turrets && b.turrets[0]) { return null }
-        return [Math.round(b.x), Math.round(b.y), ((Math.round(b.d / Math.PI * 100) % 200 + 200) % 200) * Math.PI / 100, Math.round(b.xv * tickRate), Math.round(b.yv * tickRate), 0, 0]
+        return [Math.round(b.x), Math.round(b.y), angleStep(b.d, 100) * Math.PI / 100, Math.round(b.xv * tickRate), Math.round(b.yv * tickRate), 0, 0]
+      },
+      polygonSpin: function(p) {
+        return Math.round(0.005 * dimension.tickMultiplier * (p.speed || 0) * dimension.per50 * tickRate * 500 / Math.PI)
       },
       polygonMotion: function(p) {
-        const vd = Math.round(0.005 * dimension.tickMultiplier * (p.speed || 0) * dimension.per50 * tickRate * 500 / Math.PI)
-        return [Math.round(p.x), Math.round(p.y), ((Math.round(p.d / Math.PI * 500) % 1000 + 1000) % 1000) * Math.PI / 500, Math.round(p.xv * tickRate), Math.round(p.yv * tickRate), vd * Math.PI / 500, vd]
+        const vd = net.polygonSpin(p)
+        return [Math.round(p.x), Math.round(p.y), angleStep(p.d, 500) * Math.PI / 500, Math.round(p.xv * tickRate), Math.round(p.yv * tickRate), vd * Math.PI / 500, vd]
       },
       predicted: function(k, m, seq) {
         const p = k.m
@@ -47,7 +59,15 @@
       hidden: function(tank) {
         return tank.alpha < 1 ? Math.round((1 - tank.alpha) * 20) : 0
       },
-      pick: function(state, kind, objects, removed, interval, sig, key, motion) {
+      forget: function(known, seq, removed) {
+        for(const [id, k] of known) {
+          if(k.s !== seq) {
+            known.delete(id)
+            removed.push(id)
+          }
+        }
+      },
+      pick: function(state, kind, objects, removed, interval, sig, key) {
         const known = state.known[kind], seq = state.seq, out = []
         for(const i in objects) {
           const o = objects[i]
@@ -58,42 +78,59 @@
             removed.push(o.id)
             k = false
           }
-          const s0 = sig ? sig(o, 0) : 0, s1 = sig ? sig(o, 1) : 0
+          const s0 = sig(o, 0), s1 = sig(o, 1)
           if(!k) {
-            known.set(o.id, { o: o, at: seq - (o.id % n), s: seq, s0: s0, s1: s1, v: key ? key(o) : 0, settled: false, m: motion ? motion(o) : null, ms: seq })
+            known.set(o.id, { o: o, at: seq - (o.id % n), s: seq, s0: s0, s1: s1, v: key(o), settled: false })
             out.push(o)
             continue
           }
           k.s = seq
           const forced = s0 > k.s0 || s1 !== k.s1
-          if(motion || seq - k.at >= n || forced) {
+          if(seq - k.at >= n || forced) {
             k.at = seq
             k.s0 = s0
             k.s1 = s1
-            if(motion) {
-              const m = motion(o)
-              if(!forced && this.predicted(k, m, seq)) { continue }
-              k.m = m
-              k.ms = seq
-            } else if(key) {
-              const v = key(o)
-              if(v === k.v) {
-                if(k.settled && !forced) { continue }
-                k.settled = true
-              } else {
-                k.v = v
-                k.settled = false
-              }
+            const v = key(o)
+            if(v === k.v) {
+              if(k.settled && !forced) { continue }
+              k.settled = true
+            } else {
+              k.v = v
+              k.settled = false
             }
             out.push(o)
           }
         }
-        for(const [id, k] of known) {
-          if(k.s !== seq) {
-            known.delete(id)
-            removed.push(id)
+        this.forget(known, seq, removed)
+        return out
+      },
+      pickMoving: function(state, kind, objects, removed, sig, motion) {
+        const known = state.known[kind], seq = state.seq, out = []
+        for(const i in objects) {
+          const o = objects[i]
+          if(!o || !(o.id >= 0)) { continue }
+          let k = known.get(o.id)
+          if(k && k.o !== o) {
+            removed.push(o.id)
+            k = false
           }
+          const s0 = sig(o, 0), s1 = sig(o, 1)
+          if(!k) {
+            known.set(o.id, { o: o, s: seq, s0: s0, s1: s1, m: motion(o), ms: seq })
+            out.push(o)
+            continue
+          }
+          k.s = seq
+          const forced = s0 > k.s0 || s1 !== k.s1
+          k.s0 = s0
+          k.s1 = s1
+          const m = motion(o)
+          if(!forced && this.predicted(k, m, seq)) { continue }
+          k.m = m
+          k.ms = seq
+          out.push(o)
         }
+        this.forget(known, seq, removed)
         return out
       },
       bulletSig: function(b, i) {
@@ -102,7 +139,6 @@
       polygonSig: function(p, i) {
         return i === 0 ? (Math.floor((1 - p.health / p.maxHealth) * 100) || 0) : (p.sides | 0) * 1000 + (p.radiant | 0)
       },
-      native: native && native.pick ? native : null,
       frame: 0,
       serial: 0,
       scratch: null,
@@ -110,9 +146,9 @@
         const table = state.tables && state.tables[kind]
         return (table ? table.count : 0) + state.known[kind].size
       },
-      pickMotion: function(state, kind, objects, removed, interval, sig, motion) {
-        if(!this.native) {
-          return this.pick(state, kind, objects, removed, interval, sig, null, motion)
+      pickMotion: function(state, kind, objects, removed, sig, motion) {
+        if(!native) {
+          return this.pickMoving(state, kind, objects, removed, sig, motion)
         }
         const list = Array.isArray(objects) ? objects : Object.values(objects || {})
         const length = list.length
@@ -137,7 +173,7 @@
           s.table = grown
           s.wire = grownWire
         }
-        const stamp = this.frame * 3 + kind, table = s.table, candidates = s.candidates, objs = s.objects, wire = !!this.native.encode
+        const stamp = this.frame * 3 + kind, table = s.table, candidates = s.candidates, objs = s.objects
         let count = 0
         for(let i=0;i<length;i++) {
           const o = list[i]
@@ -157,7 +193,7 @@
             } else {
               table[j + 4] = 0
             }
-            if(wire) { this.fillWire(s, kind, o, j) }
+            this.fillWire(s, kind, o, j)
           }
           candidates[count] = o._netRow
           objs[count] = o
@@ -177,7 +213,7 @@
           s.removed = new Float64Array((count + known.count) * 2)
         }
         s.info[0] = known.count
-        const sent = this.native.pick(count, candidates, table, known.index, known.entries, known.spareIndex, known.spareEntries, state.seq, this.keyframe, this.seqTime, s.out, s.removed, s.info)
+        const sent = native.pick(count, candidates, table, known.index, known.entries, known.spareIndex, known.spareEntries, state.seq, this.keyframe, this.seqTime, s.out, s.removed, s.info)
         const oldIndex = known.index, oldEntries = known.entries
         known.index = known.spareIndex
         known.entries = known.spareEntries
@@ -198,7 +234,7 @@
           bullet.id,
           Math.round(bullet.x),
           Math.round(bullet.y),
-          (Math.round(bullet.d / Math.PI * 100) % 200 + 200) % 200,
+          angleStep(bullet.d, 100),
           Math.floor((1 - bullet.health / bullet.maxHealth) * 100),
           Math.round(bullet.xv * dimension.tickRate),
           Math.round(bullet.yv * dimension.tickRate)
@@ -207,7 +243,7 @@
           let a = []
           for(let i in bullet.turrets) {
             let turret = bullet.turrets[i]
-            a.push((Math.round(turret.d / Math.PI * 100) % 200 + 200) % 200)
+            a.push(angleStep(turret.d, 100))
           }
           arr.push(a)
         }
@@ -218,11 +254,11 @@
           polygon.id,
           Math.round(polygon.x),
           Math.round(polygon.y),
-          (Math.round(polygon.d / Math.PI * 500) % 1000 + 1000) % 1000,
+          angleStep(polygon.d, 500),
           Math.floor((1 - polygon.health / polygon.maxHealth) * 500),
           Math.round(polygon.xv * dimension.tickRate),
           Math.round(polygon.yv * dimension.tickRate),
-          net.polygonMotion(polygon)[6]
+          net.polygonSpin(polygon)
         ]
       },
       bulletSection: function(list) {
@@ -321,7 +357,7 @@
       },
       rawSection: function(kind, list) {
         const s = this.scratch
-        if(!this.native || !this.native.encode || !s || s.frame !== this.frame) { return null }
+        if(!native || !s || s.frame !== this.frame) { return null }
         const n = list.length, stamp = this.frame * 3 + kind, wire = s.wire
         if(s.sent.length < n) { s.sent = new Int32Array(n * 2) }
         const rows = s.sent
@@ -332,10 +368,10 @@
           if(wire[row * 12 + 11] !== 1) { return null }
           rows[i] = row
         }
-        let size = this.native.encode(kind, n, rows, wire, s.turrets, s.bytes)
+        let size = native.encode(kind, n, rows, wire, s.turrets, s.bytes)
         if(size > s.bytes.length) {
           s.bytes = new Uint8Array(size * 2)
-          size = this.native.encode(kind, n, rows, wire, s.turrets, s.bytes)
+          size = native.encode(kind, n, rows, wire, s.turrets, s.bytes)
         }
         return new this.Raw(Buffer.from(s.bytes.subarray(0, size)))
       },
@@ -345,13 +381,13 @@
         return Buffer.from([0xdd, (count >>> 24) & 255, (count >> 16) & 255, (count >> 8) & 255, count & 255])
       },
       encode: function(code, packet) {
-        const n = packet.length, parts = [Buffer.from([0x92]), pack([code]).subarray(1), this.arrayHeader(n)]
+        const n = packet.length, parts = [Buffer.from([0x92]), pack(code), this.arrayHeader(n)]
         let start = 0
         for(let i=0;i<=n;i++) {
           if(i === n || packet[i] instanceof this.Raw) {
             if(i > start) {
               const run = packet.slice(start, i)
-              parts.push(pack(run).subarray(run.length < 16 ? 1 : run.length < 65536 ? 3 : 5))
+              parts.push(pack(run).subarray(this.arrayHeader(run.length).length))
             }
             if(i < n) { parts.push(packet[i].bytes) }
             start = i + 1
@@ -566,8 +602,8 @@
         dim.fillWalls ? true : false,
         p,
         Math.round(dim.sizeScale * 1000),
-        dim.customWeapons && Object.keys(dim.customWeapons).length > 0 ? dim.customWeapons : false,
-        dim.customBodies && Object.keys(dim.customBodies).length > 0 ? dim.customBodies : false,
+        dim.customWeapons && hasEntries(dim.customWeapons) ? dim.customWeapons : false,
+        dim.customBodies && hasEntries(dim.customBodies) ? dim.customBodies : false,
         dim.wallEdit ? true : false,
         arr,
         dim.noMinimap ? true : false,
@@ -603,20 +639,14 @@
         return net.tanks[isNear(t) ? 0 : 1]
       }, function(t, i) {
         if(i === 0) { return Math.floor((1 - t.health / t.maxHealth) * 100) || 0 }
-        let fired = 0
-        for(const b in t.firedBarrels) { fired = state.seq; break }
-        return fired + (t.typing ? 1 : 0) + (t.passive ? 2 : 0) + (t.invincible ? 4 : 0) + (t.invisible ? 8 : 0) + (t.alwaysShowOnMinimap ? 16 : 0) + (t.level | 0) * 32 + (t.team | 0) * 100000 + net.hidden(t) / 32
+        return (hasEntries(t.firedBarrels) ? state.seq : 0) + (t.typing ? 1 : 0) + (t.passive ? 2 : 0) + (t.invincible ? 4 : 0) + (t.invisible ? 8 : 0) + (t.alwaysShowOnMinimap ? 16 : 0) + (t.level | 0) * 32 + (t.team | 0) * 100000 + net.hidden(t) / 32
       }, function(t) {
-        let k = Math.round(t.x) + ',' + Math.round(t.y) + ',' + ((Math.round(t.d / Math.PI * 1000) % 2000 + 2000) % 2000) + ',' + Math.floor((1 - t.health / t.maxHealth) * 100)
-        for(let i=0,l=t._turrets.length;i<l;i++) { k += ',' + ((Math.round(t._turrets[i].d / Math.PI * 50) % 100 + 100) % 100) }
+        let k = Math.round(t.x) + ',' + Math.round(t.y) + ',' + angleStep(t.d, 1000) + ',' + Math.floor((1 - t.health / t.maxHealth) * 100)
+        for(let i=0,l=t._turrets.length;i<l;i++) { k += ',' + angleStep(t._turrets[i].d, 50) }
         return k
       })
-      const sendBullets = net.pickMotion(state, 1, options.bullets, removed[1], function(b) {
-        return net.bullets[isNear(b) ? 0 : 1]
-      }, net.bulletSig, net.bulletMotion)
-      const sendPolygons = net.pickMotion(state, 2, options.polygons, removed[2], function(p) {
-        return net.polygons[isNear(p) ? 0 : 1]
-      }, net.polygonSig, net.polygonMotion)
+      const sendBullets = net.pickMotion(state, 1, options.bullets, removed[1], net.bulletSig, net.bulletMotion)
+      const sendPolygons = net.pickMotion(state, 2, options.polygons, removed[2], net.polygonSig, net.polygonMotion)
       if(removed[0].length || removed[1].length || removed[2].length) {
         packet.push([19, removed[0], removed[1], removed[2]])
       }
@@ -628,30 +658,19 @@
         for(let i=0,l=sendTanks.length;i<l;i++) {
           let tank = sendTanks[i]
 
-          let d = (Math.round(tank.d / Math.PI * 1000) % 2000 + 2000) % 2000
-          let recordedDirections = [], length = tank._d.length
-          if(length <= 1) {
-            recordedDirections = d
-          } else {
-            let same = true
-            for(let i=0;i<5;i++) {
-              if(i < length) {
-                recordedDirections.push(tank._d[i])
-                if(same && i > 0 && tank._d[i] !== recordedDirections[i - 1]) {
-                  same = false
-                }
-              } else {
-                recordedDirections.push(d)
-              }
-            }
-            if(same) {
-              recordedDirections = d
+          let d = angleStep(tank.d, 1000)
+          let recordedDirections = d, turns = tank._d, length = Math.min(turns.length, 5)
+          for(let i=1;i<length;i++) {
+            if(turns[i] !== turns[i - 1]) {
+              recordedDirections = []
+              for(let k=0;k<5;k++) { recordedDirections.push(k < length ? turns[k] : d) }
+              break
             }
           }
           let turretDirections = []
           for(let i=0,l=tank._turrets.length;i<l;i++) {
             let turret = tank._turrets[i]
-            turretDirections.push((Math.round(turret.d / Math.PI * 50) % 100 + 100) % 100)
+            turretDirections.push(angleStep(turret.d, 50))
           }
           let arr = [
             tank.id,
@@ -663,15 +682,14 @@
             (tank.typing ? 1 : 0) + (tank.passive ? 2 : 0) + (tank.invincible ? 4 : 0) + (tank.invisible ? 8 : 0) + (tank.alwaysShowOnMinimap ? 16 : 0) + net.hidden(tank) * 32,
             tank.level
           ]
-          let firedBarrels = Object.values(tank.firedBarrels)
-          if(firedBarrels[0] >= 0) {
-            arr.push(firedBarrels)
+          if(hasEntries(tank.firedBarrels)) {
+            arr.push(Object.values(tank.firedBarrels))
           }
           data.push(arr)
         }
         packet.push(data)
       }
-      if(Object.keys(options.dim.updatedTanks)[0] >= 0) {
+      if(hasEntries(options.dim.updatedTanks)) {
         let data = [1]
         for(let i in options.dim.updatedTanks) {
           let tank = options.dim.updatedTanks[i]
@@ -690,7 +708,7 @@
         }
         packet.push(data)
       }
-      if(Object.keys(options.dim.chatMessages)[0] >= 0) {
+      if(hasEntries(options.dim.chatMessages)) {
         let data = [2]
         for(let i in options.dim.chatMessages) {
           data.push([i, options.dim.chatMessages[i]])
@@ -715,12 +733,12 @@
           packet.push(net.polygonSection(sendPolygons))
         }
       }
-      if(Object.keys(options.dim.leaderboardChanges)[0] >= 0) {
+      if(hasEntries(options.dim.leaderboardChanges)) {
         let data = [5].concat(options.dim.leaderboardChanges)
 
         packet.push(data)
       }
-      if(Object.keys(options.dim.updatedGates)[0] >= 0) {
+      if(hasEntries(options.dim.updatedGates)) {
         let data = [6]
 
         for(let i in options.dim.updatedGates) {
@@ -729,7 +747,7 @@
         }
         packet.push(data)
       }
-      if(Object.keys(options.dim.resizedWormholes)[0] >= 0) {
+      if(hasEntries(options.dim.resizedWormholes)) {
         let data = [7]
 
         for(let i in options.dim.resizedWormholes) {
@@ -742,7 +760,7 @@
         }
         packet.push(data)
       }
-      if(Object.keys(options.dim.rupturedWormholes)[0] >= 0) {
+      if(hasEntries(options.dim.rupturedWormholes)) {
         let data = [8]
 
         for(let i in options.dim.rupturedWormholes) {
@@ -751,7 +769,7 @@
         }
         packet.push(data)
       }
-      if(Object.keys(options.dim.fadeTimeChanges)[0] >= 0) {
+      if(hasEntries(options.dim.fadeTimeChanges)) {
         let data = [9]
 
         for(let i in options.dim.fadeTimeChanges) {
@@ -760,7 +778,7 @@
         }
         packet.push(data)
       }
-      if(Object.keys(options.dim.removedWormholes)[0] >= 0) {
+      if(hasEntries(options.dim.removedWormholes)) {
         let data = [10]
 
         for(let i in options.dim.removedWormholes) {
@@ -769,7 +787,7 @@
         }
         packet.push(data)
       }
-      if(Object.keys(options.dim.addedWormholes)[0] >= 0) {
+      if(hasEntries(options.dim.addedWormholes)) {
         let data = [11]
 
         for(let i in options.dim.addedWormholes) {
@@ -797,7 +815,7 @@
         options.tank.lastDarkness = options.tank.darknessUpdated
         options.tank.darknessUpdated = -1
       }
-      if(Object.keys(options.dim.updatedPortals)[0] >= 0) {
+      if(hasEntries(options.dim.updatedPortals)) {
         let data = [13]
 
         for(let i in options.dim.updatedPortals) {
@@ -810,7 +828,7 @@
         }
         packet.push(data)
       }
-      if(Object.keys(options.dim.updatedWalls)[0] >= 0) {
+      if(hasEntries(options.dim.updatedWalls)) {
         let data = [14]
 
         for(let i in options.dim.updatedWalls) {
@@ -830,7 +848,7 @@
       if(options.dim.mapSizeUpdated) {
         packet.push([15, options.dim.mapSizeUpdated])
       }
-      if(Object.keys(options.dim.removedWalls)[0] >= 0) {
+      if(hasEntries(options.dim.removedWalls)) {
         let data = [16]
 
         for(let i in options.dim.removedWalls) {
@@ -839,7 +857,7 @@
         }
         packet.push(data)
       }
-      if(Object.keys(options.dim.matrixWallChanges).length > 0) {
+      if(hasEntries(options.dim.matrixWallChanges)) {
         let data = [17, [], []]
 
         for(let x in options.dim.matrixWallChanges) {

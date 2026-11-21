@@ -78,17 +78,24 @@ test('it fires within the projectile limits and aims at the player', async () =>
 
 test('server barrels sit exactly where the client draws them', async () => {
   const state = boss.codeState
-  const holders = state.barrels.map(b => ({ fire: b.node.fire, x: b.barrel.turret.gameX, y: b.barrel.turret.gameY, d: b.barrel.turret.d }))
+  const holders = state.barrels.map((b, i) => ({ fire: i, x: b.barrel.turret.gameX, y: b.barrel.turret.gameY, d: b.barrel.turret.d }))
   const snap = { x: boss.x, y: boss.y, d: boss.d, size: boss.size, time: state.time, turrets: boss._turrets.map(t => t.d) }
   const r = renderer({ 'unknow-remaster': JSON.stringify(tankCode.forClient(tankCode.load(realCode()))) })
   await r.load('unknow-remaster')
   const seen = {}
+  const fires = new Map()
+  const order = []
+  const flat = function(list) { for(const n of list) { order.push(n); if(n.children) { flat(n.children) } } }
+  flat(tankCode.load(realCode()).render)
+  const items = r.render.codeTanks['unknow-remaster'].main.items
+  let next = 0
+  for(let i = 0; i < items.length; i++) { if(order[i].t === 'barrel' && !order[i].visual) { fires.set(items[i].node, next++) } }
   const original = r.render.drawCodeBarrel
   r.render.drawCodeBarrel = function(node, k) {
-    if(node.fire >= 0) {
+    if(fires.has(node)) {
       const m = r.matrix(), s = Math.sin(node.d), c = Math.cos(node.d)
       const bx = (node.x * c - node.y * s) * k, by = (node.x * s + node.y * c) * k
-      seen[node.fire] = { x: m[0] * bx + m[2] * by + m[4], y: m[1] * bx + m[3] * by + m[5], d: Math.atan2(m[1] * c + m[3] * s, m[0] * c + m[2] * s) - Math.PI / 2 }
+      seen[fires.get(node)] = { x: m[0] * bx + m[2] * by + m[4], y: m[1] * bx + m[3] * by + m[5], d: Math.atan2(m[1] * c + m[3] * s, m[0] * c + m[2] * s) - Math.PI / 2 }
     }
     return original.apply(r.render, arguments)
   }

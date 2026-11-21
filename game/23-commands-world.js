@@ -1,12 +1,11 @@
       boss: [
-        [[], function(data, tank, ws) {
-          commands.spawnBoss(tank, ws, 'random', tank.mousePosition)
-        }],
-        [['string'], function(data, tank, ws) {
-          commands.spawnBoss(tank, ws, data[0], tank.mousePosition)
-        }],
-        [['string', 'position'], function(data, tank, ws) {
-          commands.spawnBoss(tank, ws, data[0], data[1])
+        [['?'], function(data, tank, ws) {
+          commands.bossCommand(tank, ws, data[0])
+        }]
+      ],
+      bosses: [
+        [['?'], function(data, tank, ws) {
+          commands.listBosses(tank, ws, data[0])
         }]
       ],
       tankcode: [

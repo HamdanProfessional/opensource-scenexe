@@ -10,6 +10,9 @@ int args_load(args_t *a, napi_env env, napi_callback_info info, size_t need)
     args_fail(a, "could not read arguments");
     return 0;
   }
+  if(a->argc > ARGS_MAX) {
+    a->argc = ARGS_MAX;
+  }
   if(a->argc < need) {
     args_fail(a, "not enough arguments");
     return 0;

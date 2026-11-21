@@ -351,16 +351,30 @@
       return wormhole
     },
     bossIds: function() {
-      return Object.keys(tankData.bodies).filter(k => tankData.bodies[k].boss && tankData.weapons[k])
+      return Object.keys(tankData.bodies).filter(function(k) { return tankData.bodies[k].boss && tankData.weapons[k] })
+    },
+    bossKey: function(text) {
+      return String(text || '').toLowerCase().replace(/^boss:/, '').replace(/[\s_-]+/g, '')
+    },
+    bossTitle: function(id) {
+      return tankData.bodies[id].boss.name.split(' ').pop().toLowerCase()
+    },
+    bossMatches: function(name) {
+      let ids = generator.bossIds(), n = generator.bossKey(name)
+      if(n === '' || n === 'random') { return ids }
+      if(ids.indexOf('boss:' + n) >= 0) { return ['boss:' + n] }
+      let rank = /^rank([0-9])$/.exec(n)
+      return ids.filter(function(id) {
+        let boss = tankData.bodies[id].boss
+        if(rank) { return boss.rank === Number(rank[1]) }
+        return generator.bossKey(boss.name) === n || boss.family === n || generator.bossTitle(id) === n
+      })
     },
     findBoss: function(name) {
-      let ids = generator.bossIds(), n = String(name || 'random').toLowerCase().replace(/^boss:/, '')
-      if(n === 'random') { return generator.randomBoss(ids) }
-      if(ids.indexOf('boss:' + n) >= 0) { return 'boss:' + n }
-      let family = ids.filter(k => tankData.bodies[k].boss.family === n)
-      if(family.length) { return family[Math.floor(Math.random() * family.length)] }
-      let named = ids.filter(k => tankData.bodies[k].boss.name.toLowerCase().replace(/ /g, '') === n)
-      return named[0] || false
+      let key = generator.bossKey(name), ids = generator.bossMatches(key)
+      if(ids.length === 0) { return false }
+      if(key === '' || key === 'random') { return generator.randomBoss(ids) }
+      return ids[Math.floor(Math.random() * ids.length)]
     },
     randomBoss: function(ids) {
       ids = ids || generator.bossIds()

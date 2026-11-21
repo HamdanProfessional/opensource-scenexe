@@ -1,6 +1,7 @@
 const fs = require('fs')
 const path = require('path')
 const crypto = require('crypto')
+const { promisify } = require('util')
 
 const FILE = path.join(__dirname, 'accounts.json')
 
@@ -10,13 +11,9 @@ const SHA256 = function(s) {
 
 const SCRYPT = { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 }
 
+const scryptAsync = promisify(crypto.scrypt)
 const scrypt = function(password, salt) {
-  return new Promise(function(resolve, reject) {
-    crypto.scrypt(String(password), salt, 32, SCRYPT, function(err, key) {
-      if(err) { return reject(err) }
-      resolve(key)
-    })
-  })
+  return scryptAsync(String(password), salt, 32, SCRYPT)
 }
 
 const hashPassword = async function(password) {
@@ -110,21 +107,19 @@ const Accounts = {
       resolve(wrap(normalize(a)))
     })
   },
-  create: function(o) {
-    return new Promise(async function(resolve) {
-      const u = typeof o.username === 'string' ? o.username.toLowerCase() : ''
-      if(!validUsername(u)) { return resolve({ success: false, message: 'Invalid username' }) }
-      if(typeof o.password !== 'string' || o.password.length <= 0 || o.password.length > 30) {
-        return resolve({ success: false, message: 'Invalid password' })
-      }
-      if(store[u]) { return resolve({ success: false, message: 'That username is taken' }) }
-      const hashed = await hashPassword(o.password)
-      if(store[u]) { return resolve({ success: false, message: 'That username is taken' }) }
-      const a = normalize({ username: u, password: hashed })
-      store[u] = a
-      flushNow()
-      resolve({ success: true, account: wrap(a) })
-    })
+  create: async function(o) {
+    const u = typeof o.username === 'string' ? o.username.toLowerCase() : ''
+    if(!validUsername(u)) { return { success: false, message: 'Invalid username' } }
+    if(typeof o.password !== 'string' || o.password.length <= 0 || o.password.length > 30) {
+      return { success: false, message: 'Invalid password' }
+    }
+    if(store[u]) { return { success: false, message: 'That username is taken' } }
+    const hashed = await hashPassword(o.password)
+    if(store[u]) { return { success: false, message: 'That username is taken' } }
+    const a = normalize({ username: u, password: hashed })
+    store[u] = a
+    flushNow()
+    return { success: true, account: wrap(a) }
   },
   readUsername: function(a) {
     return a.username

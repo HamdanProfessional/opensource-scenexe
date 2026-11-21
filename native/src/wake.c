@@ -13,9 +13,6 @@ napi_value js_wake(napi_env env, napi_callback_info info)
   }
   n = args_int(&a, 0);
   wake_count = args_int(&a, 2);
-  if(a.failed) {
-    return NULL;
-  }
   if(n < 0 || wake_count < 0) {
     return args_fail(&a, "bad wake arguments");
   }

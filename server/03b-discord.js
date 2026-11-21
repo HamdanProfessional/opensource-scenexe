@@ -461,11 +461,10 @@ const discordBot = (function() {
       .addChannelOption(o => o.setName('channel').setDescription('Channel (default: this one)').addChannelTypes(ChannelType.GuildText))
   ]
 
-  const readDuration = function(interaction) {
-    const text = interaction.options.getString('duration')
-    if(!text) { return null }
-    const ms = durations.parse(text)
-    return ms === null ? false : ms
+  const runStaff = function(type, args) {
+    let note = ''
+    staffAction(type, args, function(t) { note = t })
+    return note
   }
 
   const gameCommands = {
@@ -478,62 +477,46 @@ const discordBot = (function() {
     kick: function(interaction) {
       const found = findPlayer(interaction.options.getString('player'))
       if(found.error) { return found.error }
-      let note = ''
-      staffAction('kick', [found.client.data.id, actor(interaction)], function(t) { note = t })
-      return note || `Kicked ${player(found.client)}.`
+      return runStaff('kick', [found.client.data.id, actor(interaction)]) || `Kicked ${player(found.client)}.`
     },
     ban: function(interaction) {
       const found = findPlayer(interaction.options.getString('player'))
       if(found.error) { return found.error }
-      const ms = readDuration(interaction)
-      if(ms === false) { return 'Use a time like 30m, 2h or 7d, or leave it empty for a permanent ban.' }
-      let note = ''
+      const text = interaction.options.getString('duration')
+      const ms = text ? durations.parse(text) : null
+      if(text && ms === null) { return 'Use a time like 30m, 2h or 7d, or leave it empty for a permanent ban.' }
       const name = found.client.accountName || found.client.data.name
-      staffAction('ban', [found.client.data.id, actor(interaction), name, ms, interaction.options.getString('reason')], function(t) { note = t })
-      return note
+      return runStaff('ban', [found.client.data.id, actor(interaction), name, ms, interaction.options.getString('reason')])
     },
     bans: function(interaction) {
-      let note = ''
-      staffAction('bans', [actor(interaction)], function(t) { note = t })
-      return note
+      return runStaff('bans', [actor(interaction)])
     },
     mute: function(interaction) {
       const found = findPlayer(interaction.options.getString('player'))
       if(found.error) { return found.error }
-      const ms = readDuration(interaction)
-      if(ms === false) { return 'Use a time like 30m, 2h or perm, or leave it empty for 10 minutes.' }
-      let note = ''
-      staffAction('mute', [found.client.data.id, actor(interaction), ms, interaction.options.getString('reason'), found.client.data.name], function(t) { note = t })
-      return note
+      const text = interaction.options.getString('duration')
+      const ms = text ? durations.parse(text) : null
+      if(text && ms === null) { return 'Use a time like 30m, 2h or perm, or leave it empty for 10 minutes.' }
+      return runStaff('mute', [found.client.data.id, actor(interaction), ms, interaction.options.getString('reason'), found.client.data.name])
     },
     unmute: function(interaction) {
       const target = interaction.options.getString('target')
       const found = findPlayer(target)
-      let note = ''
-      staffAction('unmute', [target, actor(interaction), found.client ? found.client.data.id : -1], function(t) { note = t })
-      return note
+      return runStaff('unmute', [target, actor(interaction), found.client ? found.client.data.id : -1])
     },
     mutes: function(interaction) {
-      let note = ''
-      staffAction('mutes', [actor(interaction), true], function(t) { note = t })
-      return note
+      return runStaff('mutes', [actor(interaction), true])
     },
     whois: function(interaction) {
       const found = findPlayer(interaction.options.getString('player'))
       if(found.error) { return found.error }
-      let note = ''
-      staffAction('whois', [found.client.data.id, actor(interaction), null, true], function(t) { note = t })
-      return note
+      return runStaff('whois', [found.client.data.id, actor(interaction), null, true])
     },
     unban: function(interaction) {
-      let note = ''
-      staffAction('unban', [interaction.options.getString('target'), actor(interaction)], function(t) { note = t })
-      return note
+      return runStaff('unban', [interaction.options.getString('target'), actor(interaction)])
     },
     role: function(interaction) {
-      let note = ''
-      staffAction('setRole', [interaction.options.getString('account'), interaction.options.getString('role'), actor(interaction)], function(t) { note = t })
-      return note
+      return runStaff('setRole', [interaction.options.getString('account'), interaction.options.getString('role'), actor(interaction)])
     },
     restart: function(interaction) {
       const name = interaction.options.getString('dimension')

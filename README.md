@@ -1,16 +1,16 @@
 # Open-Scenexe
 
-A free, open source tank game that runs in the browser. Shoot shapes and other players, level up, and build your tank by upgrading your weapon and your body on separate paths. It has Free For All, 2 Teams, 4 Teams, deeper dimensions reached through portals (Crossroads, Sanctuary, Abyss, Void), a Survival minigame, a Tank Editor and a Testing Range. You can also play with a separate set of Arras tanks.
+A free, open source tank game that runs in the browser. Shoot shapes and other players, level up, and upgrade your weapon and body on separate paths.
 
 Play on the official server: http://144.91.117.163:22440/
 
 ## Host your own server
 
-Anyone can run their own Open-Scenexe server. It is the full game, with every gamemode, and it updates itself from this repository every time it restarts.
+You can run your own Open-Scenexe server with every gamemode. It updates itself from this repository each time it restarts.
 
 ### What you need
 
-- Python 3.8 or newer. Nothing else: the launcher downloads Node.js and the game's packages by itself.
+- Python 3.8 or newer. The launcher downloads Node.js and the game's packages.
 - A computer or VPS that stays on while people play. Windows, Linux and macOS all work, on x64 or ARM.
 - For other people to join over the internet: a public IP address and an open TCP port (22443 by default).
 
@@ -39,16 +39,16 @@ On a VPS you usually only need the firewall step.
 
 ### config.json
 
-All settings are optional. Add only the ones you want to change.
+Every setting is optional.
 
 | Key | What it does | Default |
 | --- | --- | --- |
 | `port` | The port players connect to. | `22443` |
 | `internalPortBase` | First of the internal ports used between the server and the gamemodes. It uses this port and the next 9. Change it if those ports are taken. | `9030` |
 | `debug` | `1` prints more information in the terminal. `0` is quieter. | `1` |
-| `network` | How often the server sends updates to players. Leave it as it is unless you know you need to change it. | |
-| `serverList` | Puts your server on the in-game server list. See below. | |
-| `discord` | Settings for the optional Discord bot. See below. | |
+| `network` | Updates sent per second for each kind of object (`sendRate`, `nearTanks`, `farTanks` and so on). | The values in the shipped `config.json` |
+| `serverList` | Puts your server on the in-game server list. See below. | - |
+| `discord` | Settings for the optional Discord bot. See below. | - |
 
 You can also set the port with the `SERVER_PORT` environment variable, which wins over `config.json`. Many game server panels set it for you.
 

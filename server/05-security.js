@@ -1,3 +1,5 @@
+const net = require('net')
+
 let banned = {}, banDetails = {}
 const bannedPath = './banned.txt'
 
@@ -36,7 +38,7 @@ const banMessage = function(ban) {
   return ban && ban.reason ? `${text}: ${ban.reason}` : text
 }
 
-let fetchBanned = function() {
+const fetchBanned = function() {
   try {
     const now = Date.now(), lines = readBans(), live = []
     let nbanned = {}, details = {}
@@ -153,8 +155,6 @@ let limit = {
   }
 }
 
-const net = require('net')
-
 const cleanIp = function(ip) {
   ip = String(ip || '').trim()
   if(ip.startsWith('::ffff:') && net.isIPv4(ip.slice(7))) { ip = ip.slice(7) }
@@ -163,12 +163,7 @@ const cleanIp = function(ip) {
 
 const proxyRanges = (function() {
   const list = new net.BlockList()
-  const add = function(cidr) {
-    const [address, bits] = cidr.split('/')
-    const type = net.isIPv6(address) ? 'ipv6' : 'ipv4'
-    try { list.addSubnet(address, Number(bits), type) } catch(e) {}
-  }
-  const local = ['127.0.0.0/8', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '::1/128', 'fc00::/7']
+  const privateProxies = ['127.0.0.0/8', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '::1/128', 'fc00::/7']
   const cloudflare = [
     '173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22', '141.101.64.0/18', '108.162.192.0/18',
     '190.93.240.0/20', '188.114.96.0/20', '197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13',
@@ -176,19 +171,22 @@ const proxyRanges = (function() {
     '2400:cb00::/32', '2606:4700::/32', '2803:f800::/32', '2405:b500::/32', '2405:8100::/32', '2a06:98c0::/29', '2c0f:f248::/32'
   ]
   const extra = Array.isArray(config.trustedProxies) ? config.trustedProxies : []
-  for(const cidr of local.concat(cloudflare, extra)) { add(String(cidr).includes('/') ? String(cidr) : String(cidr) + (net.isIPv6(String(cidr)) ? '/128' : '/32')) }
+  for(const entry of privateProxies.concat(cloudflare, extra)) {
+    const cidr = String(entry)
+    const [address, bits] = (cidr.includes('/') ? cidr : cidr + (net.isIPv6(cidr) ? '/128' : '/32')).split('/')
+    try {
+      list.addSubnet(address, Number(bits), net.isIPv6(address) ? 'ipv6' : 'ipv4')
+    } catch(e) {
+      console.log('Ignoring bad trusted proxy "' + cidr + '"')
+    }
+  }
   return list
 })()
 
-const isTrustedProxy = function(ip) {
-  if(!net.isIP(ip)) { return false }
-  return proxyRanges.check(ip, net.isIPv6(ip) ? 'ipv6' : 'ipv4')
-}
-
 const getIp = function(req) {
   const peer = cleanIp(req.socket.remoteAddress)
-  if(!isTrustedProxy(peer)) { return peer }
-  const forwarded = cleanIp(String(req.headers['cf-connecting-ip'] || String(req.headers['x-forwarded-for'] || '').split(',')[0] || ''))
+  if(!net.isIP(peer) || !proxyRanges.check(peer, net.isIPv6(peer) ? 'ipv6' : 'ipv4')) { return peer }
+  const forwarded = cleanIp(req.headers['cf-connecting-ip'] || String(req.headers['x-forwarded-for'] || '').split(',')[0])
   return net.isIP(forwarded) ? forwarded : peer
 }
 
@@ -201,37 +199,53 @@ const ipGroup = function(ip) {
   return full.slice(0, 4).map(function(p) { return (parseInt(p, 16) || 0).toString(16) }).join(':') + '::/64'
 }
 
-let attackmode = 0, interactions = {}
-
-setInterval(function() {
-  const cutoff = performance.now() - 60000
-  for(const ip in interactions) {
-    const list = interactions[ip].filter(function(t) { return t >= cutoff })
-    if(list.length) { interactions[ip] = list } else { delete interactions[ip] }
+const hitCounter = function(windowMs) {
+  const data = {}
+  const list = function(key) {
+    const cutoff = Date.now() - windowMs
+    const hits = (data[key] || []).filter(function(t) { return t > cutoff })
+    if(hits.length) { data[key] = hits } else { delete data[key] }
+    return hits
   }
-}, 60000)
+  setInterval(function() {
+    for(const key in data) { list(key) }
+  }, 60000)
+  return {
+    list: list,
+    add: function(key) {
+      const hits = list(key)
+      hits.push(Date.now())
+      data[key] = hits
+      return hits.length
+    },
+    clear: function(key) {
+      delete data[key]
+    }
+  }
+}
+
+let attackmode = 0
+const floods = hitCounter(60000)
 
 let filter = {
   requests: [],
   perIpLimit: 240,
   add: function(ip) {
     const now = performance.now()
-    const mine = interactions[ip] || (interactions[ip] = [])
-    mine.push(now)
-    while(mine.length && mine[0] < now - 60000) { mine.shift() }
-    if(mine.length > filter.perIpLimit && typeof anticheat !== 'undefined' && anticheat.ban(ip, 'flooding the website with ' + mine.length + ' requests a minute')) {
-      delete interactions[ip]
+    const key = ipGroup(ip)
+    const count = floods.add(key)
+    if(count > filter.perIpLimit && anticheat.ban(ip, 'flooding the website with ' + count + ' requests a minute')) {
+      floods.clear(key)
     }
     const arr = filter.requests
     arr.push(now)
     while(arr.length && arr[0] < now - 60000) { arr.shift() }
     if(arr.length > 600 && attackmode <= now) {
       attackmode = now + 120000
-      console.log('Attack Mode', arr.length)
-      discordBot.send('spam', `Attack mode on: ${arr.length} requests in a minute, connections now need harder proof of work`)
-      discordBot.send('gameStatus', 'Attack mode on, the server is getting flooded with connections')
-    } else if(arr.length > 600) {
-      attackmode = Math.max(attackmode, now + 30000)
+      console.log('Attack mode on', arr.length)
+      discordBot.send('spam', `Attack mode on: ${arr.length} requests a minute`)
+      discordBot.send('gameStatus', 'Attack mode on, the server is getting flooded')
     }
   }
 }
+

@@ -200,19 +200,30 @@
     }, [sides, radiant])
   }
 
-  const loopDelay = require('perf_hooks').monitorEventLoopDelay({ resolution: 10 })
+  let v8 = require('v8')
+  let loopDelay = perf_hooks.monitorEventLoopDelay({ resolution: 10 })
   loopDelay.enable()
   setInterval(function() {
-    let c = {}
+    let stats = {}
     for(let n in dimension.dims) {
       let d = dimension.dims[n]
-      const owners = dimension.bulletOwners(d).slice(0, 3).map(e => [String(e[0].name || 'unnamed').slice(0, 30), e[1]])
-      c[n] = [d.playerCount(), d.getTickrate(), d.getTickTime(), d.getUpdateTime(), d.getObjectLength(), d.tanks.length, d.bullets.length, d.polygons.length, d.paused ? 0 : d.workAvg || 0, d.statsPeak || 0, d.paused ? 0 : d.netAvg || 0, owners, !!d.paused]
+      stats[n] = {
+        players: d.playerCount(),
+        tps: d.getTickrate(),
+        tanks: d.tanks.length,
+        bullets: d.bullets.length,
+        shapes: d.polygons.length,
+        avg: d.paused ? 0 : d.workAvg || 0,
+        peak: d.statsPeak || 0,
+        net: d.paused ? 0 : d.netAvg || 0,
+        top: dimension.bulletOwners(d).slice(0, 3).map(e => [String(e[0].name || 'unnamed').slice(0, 30), e[1]]),
+        paused: !!d.paused
+      }
       d.statsPeak = 0
     }
-    const info = { heap: require('v8').getHeapStatistics().used_heap_size, loopP99: loopDelay.percentile(99) / 1e6, loopMax: loopDelay.max / 1e6 }
+    let info = { heap: v8.getHeapStatistics().used_heap_size, loopP99: loopDelay.percentile(99) / 1e6, loopMax: loopDelay.max / 1e6 }
     loopDelay.reset()
-    args.parentPort.postMessage(['dimStats', c, info])
+    args.parentPort.postMessage(['dimStats', stats, info])
   }, 3000)
 
   return { game, dimension, packer, net, generator, Detector, View, httpServer, server, commands, addBot }

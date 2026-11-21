@@ -19,11 +19,7 @@ typedef struct {
 
 static size_t cell_hash(int64_t cx, int64_t cy)
 {
-  uint64_t h = (uint64_t)cx * 0x9E3779B97F4A7C15ULL ^ (uint64_t)cy * 0xC2B2AE3D27D4EB4FULL;
-  h ^= h >> 29;
-  h *= 0xBF58476D1CE4E5B9ULL;
-  h ^= h >> 32;
-  return (size_t)h;
+  return (size_t)mix64((uint64_t)cx * 0x9E3779B97F4A7C15ULL ^ (uint64_t)cy * 0xC2B2AE3D27D4EB4FULL);
 }
 
 static cell *grid_find(grid *g, int64_t cx, int64_t cy, int insert)
@@ -111,9 +107,6 @@ napi_value js_view(napi_env env, napi_callback_info info)
   limit = args_int(&a, 5);
   slice_width = args_num(&a, 6);
   cell_size = args_num(&a, 7);
-  if(a.failed) {
-    return NULL;
-  }
   if(n < 0 || !(slice_width > 0) || !(cell_size > 0)) {
     return args_fail(&a, "bad view arguments");
   }

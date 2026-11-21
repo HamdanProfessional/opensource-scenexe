@@ -2,31 +2,15 @@ let locked = false
 
 let uids = {}
 
+const failures = hitCounter(10 * 60 * 1000)
 const attempts = {
-  data: {},
-  windowMs: 10 * 60 * 1000,
-  list: function(key) {
-    const now = Date.now()
-    const list = (attempts.data[key] || []).filter(function(t) { return t > now - attempts.windowMs })
-    if(list.length) { attempts.data[key] = list } else { delete attempts.data[key] }
-    return list
-  },
   blocked: function(key, max) {
-    return attempts.list(key).length >= max
+    return failures.list(key).length >= max
   },
-  add: function(key) {
-    const list = attempts.list(key)
-    list.push(Date.now())
-    attempts.data[key] = list
-  },
-  clear: function(key) {
-    delete attempts.data[key]
-  }
+  add: failures.add,
+  clear: failures.clear
 }
 
-setInterval(function() {
-  for(const key in attempts.data) { attempts.list(key) }
-}, 60000)
 const trafficMeter = function() {
   let sec = 0, count = 0, bytes = 0, lastCount = 0, lastBytes = 0
   const roll = function() {
@@ -185,7 +169,7 @@ server.on("connection", (ws, request) => {
         let u = data[1][0], p = data[1][1]
         const createKey = 'create:' + ipGroup(ws._ip)
         if(attempts.blocked(createKey, 3)) {
-          ws.sendPacket('flag', ['login', 0, 'Too many new accounts from your network, try again later'])
+          ws.sendPacket('flag', ['login', 0, 'Too many new accounts. Try again later.'])
           return
         }
         if(typeof u === 'string' && words.isBad(u)) {
@@ -197,7 +181,6 @@ server.on("connection", (ws, request) => {
           username: u,
           password: p
         }).then(function(d) {
-          console.log(d)
           if(d.success) {
             attempts.add(createKey)
             d.account.account.lastOnline = Math.floor(Date.now() / 1000)
@@ -210,6 +193,9 @@ server.on("connection", (ws, request) => {
           } else {
             ws.sendPacket('flag', ['login', 0, d.message || 'Could not create account'])
           }
+        }).catch(function(e) {
+          console.log('create account error', e && e.stack || e)
+          ws.sendPacket('flag', ['login', 0, 'Server error, try again'])
         })
       } else if(type === 'joinGame') {
         let dim = data[1][1]
@@ -304,8 +290,8 @@ server.on("connection", (ws, request) => {
               }
               return
             }
-          } else if(str.trim()) {
-            const mute = mutes.of(ws)
+          } else {
+            const mute = str.trim() && mutes.of(ws)
             if(mute) {
               ws.sendPacket('announcement', mutes.describe(mute))
               return
@@ -322,9 +308,9 @@ server.on("connection", (ws, request) => {
             if(!ws.data.ready) {
               console.log('attempt login username:', data[1][0])
               const ipKey = 'login-ip:' + ipGroup(ws._ip)
-              const userKey = 'login-user:' + String(data[1][0]).toLowerCase()
+              const userKey = 'login-user:' + ipGroup(ws._ip) + ':' + String(data[1][0]).toLowerCase()
               if(attempts.blocked(ipKey, 6) || attempts.blocked(userKey, 10)) {
-                ws.sendPacket('flag', ['login', 0, 'Too many wrong passwords, try again in a few minutes'])
+                ws.sendPacket('flag', ['login', 0, 'Too many failed logins. Wait a few minutes.'])
                 return
               }
               ws.data.loginWaiting = true

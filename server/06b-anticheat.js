@@ -114,14 +114,13 @@ const anticheat = (function() {
     const recent = (kicks[key] || []).filter(t => t > now - 10 * 60 * 1000)
     recent.push(now)
     kicks[key] = recent
-    if(recent.length >= settings.kicksBeforeBan && !exempt(ws._ip)) {
-      bans[key] = now + settings.banMinutes * 60 * 1000
-      delete kicks[key]
-      log(ws, `temporarily banned for ${settings.banMinutes} minutes`)
-    }
     try { ws.sendPacket('flag', 'cheat') } catch(e) {}
     ws.sendPacket = function() {}
     setTimeout(function() { try { ws.close() } catch(e) {} }, 50)
+    if(recent.length >= settings.kicksBeforeBan) {
+      delete kicks[key]
+      ban(ws._ip, 'too many kicks')
+    }
   }
 
   const strike = function(ws, weight, reason) {

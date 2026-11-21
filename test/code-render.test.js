@@ -6,6 +6,13 @@ const real = JSON.stringify(tankCode.forClient(tankCode.load(realCode())))
 const pointer = JSON.stringify(tankCode.forClient(tankCode.load({ name: 'Pointer', render: [polygon({ polygonData: { sides: 0, size: 0.2 } }), barrel(0, { w: 0.1, h: 1 })] })))
 const looked = JSON.stringify(tankCode.forClient(tankCode.load({ name: 'Looked', render: [polygon(), barrel(3, { data: { bulletCode: { render: [polygon({ polygonData: { sides: 4, size: 1 } })] } } })] })))
 
+const fade = function(r) {
+  r.render.scaleFade = function(f) {
+    const alpha = f <= 1 ? f : 2 - f
+    r.ctx.globalAlpha = alpha < 1 ? alpha * r.render.drawAlpha : r.render.drawAlpha
+  }
+}
+
 const drawOnce = function(r, tank, at) {
   r.ops.length = 0
   r.ctx.setTransform(1, 0, 0, 1, at, at)
@@ -77,6 +84,7 @@ test('spinning parts move over time', async () => {
 test('shots are found after the normal barrels and drawn with their look', async () => {
   const r = renderer({ looked: looked })
   await r.load('looked')
+  fade(r)
   const tank = { code: 'looked', size: 40, d: 0, _barrels: [{}, {}] }
   assert.strictEqual(r.render.codeShot(tank, 1), null)
   const shot = r.render.codeShot(tank, 2)

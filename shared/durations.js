@@ -1,37 +1,35 @@
-const UNITS = { s: 1000, m: 60000, h: 3600000, d: 86400000, w: 604800000 }
-const NAMES = {
-  sec: 's', secs: 's', second: 's', seconds: 's',
-  min: 'm', mins: 'm', minute: 'm', minutes: 'm',
-  hr: 'h', hrs: 'h', hour: 'h', hours: 'h',
-  day: 'd', days: 'd',
-  week: 'w', weeks: 'w'
-}
-const FOREVER = ['perm', 'permanent', 'forever', 'never']
-const LONGEST = 3650 * UNITS.d
+let UNITS = { s: 1000, m: 60000, h: 3600000, d: 86400000, w: 604800000 }
+let WORDS = { sec: 's', min: 'm', hr: 'h', hour: 'h', day: 'd', week: 'w' }
+let LONGEST = 3650 * UNITS.d
 
-const parse = function(text) {
-  const s = String(text == null ? '' : text).trim().toLowerCase().replace(/\s+/g, ' ')
-  if(FOREVER.indexOf(s) >= 0) { return 0 }
-  const match = /^(\d+(?:\.\d+)?) ?([a-z]*)$/.exec(s)
+function parse(text) {
+  let s = String(text == null ? '' : text).trim().toLowerCase()
+  if(s === 'perm' || s === 'permanent') { return 0 }
+  let match = /^(\d+(?:\.\d+)?) ?([a-z]+)$/.exec(s)
   if(!match) { return null }
-  const unit = match[2] === '' ? 'm' : UNITS[match[2]] ? match[2] : NAMES[match[2]]
+  let word = match[2]
+  let unit = UNITS[word] ? word : WORDS[word.replace(/s$/, '')]
   if(!unit) { return null }
-  const ms = Math.round(parseFloat(match[1]) * UNITS[unit])
+  let ms = Math.round(parseFloat(match[1]) * UNITS[unit])
   return ms >= 1000 && ms <= LONGEST ? ms : null
 }
 
-const format = function(ms) {
+function format(ms) {
   let seconds = Math.max(0, Math.round(ms / 1000))
   if(seconds === 0) { return '0s' }
-  const parts = []
-  for(const [unit, size] of [['d', 86400], ['h', 3600], ['m', 60], ['s', 1]]) {
-    if(seconds >= size) {
-      parts.push(Math.floor(seconds / size) + unit)
-      seconds %= size
+  let parts = []
+  let sizes = [['d', 86400], ['h', 3600], ['m', 60], ['s', 1]]
+  for(let i=0;i<sizes.length && parts.length < 2;i++) {
+    if(seconds >= sizes[i][1]) {
+      parts.push(Math.floor(seconds / sizes[i][1]) + sizes[i][0])
+      seconds %= sizes[i][1]
     }
-    if(parts.length === 2) { break }
   }
   return parts.join(' ')
 }
 
-module.exports = { parse, format }
+function span(ms) {
+  return ms ? `for ${format(ms)}` : 'permanently'
+}
+
+module.exports = { parse, format, span }

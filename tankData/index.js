@@ -1,28 +1,28 @@
 const fs = require('fs')
 const path = require('path')
+const tankCode = require('../shared/tank-code.js')
 
 const FOLDERS = ['upgrades', 'weapons', 'bodies']
 
-const clamp = function(value, low, high, fallback) {
-  return value > 0 ? Math.max(low, Math.min(high, value)) : fallback
+const clamp = function(value, low, high) {
+  return Math.max(low, Math.min(high, value))
 }
 
-const codeTanks = function(root) {
+const codeBodies = function(root) {
   const dir = path.join(root, 'codes')
   if(!fs.existsSync(dir)) { return '' }
-  const codes = require('../shared/tank-code.js').folder(dir)
+  const codes = tankCode.folder(dir)
   const bodies = {}, weapons = {}
   for(const name in codes) {
-    const tank = codes[name].tank, stats = tank.stats || {}
-    const color = tank.color >= 0 ? { r: (tank.color >> 16) & 255, g: (tank.color >> 8) & 255, b: tank.color & 255 } : { r: 0, g: 178, b: 225 }
+    const tank = codes[name].tank, stats = tank.stats, units = tankCode.STATS
     bodies['code:' + name] = {
       name: tank.name || name,
-      movementSpeed: clamp(stats.movementSpeed / 50, 0.25, 2, 1),
-      maxHealth: clamp(stats.maxHealth / 100, 0.5, 20, 1),
-      bodyDamage: clamp(stats.bodyDamage / 10, 0.25, 5, 1),
-      cameraSizeMultiplier: clamp(stats.cameraSize / 10, 0.5, 3, 1),
+      movementSpeed: clamp(stats.movementSpeed / units.movementSpeed.unit, 0.25, 2),
+      maxHealth: clamp(stats.maxHealth / units.maxHealth.unit, 0.5, 20),
+      bodyDamage: clamp(stats.bodyDamage / units.bodyDamage.unit, 0.25, 5),
+      cameraSizeMultiplier: clamp(stats.cameraSize / units.cameraSize.unit, 0.5, 3),
       sides: 0,
-      color: color,
+      color: { r: (tank.color >> 16) & 255, g: (tank.color >> 8) & 255, b: tank.color & 255 },
       turrets: [],
       auras: [],
       code: name
@@ -43,7 +43,7 @@ const source = function(root) {
       s += `// ---- ${folder}/${f}\n` + fs.readFileSync(path.join(dir, f)).toString() + '\n'
     }
   }
-  s += codeTanks(root)
+  s += codeBodies(root)
   return s + 'window.tankData = { weapons, bodies, weaponUpgradeMap, bodyUpgradeMap }\n'
 }
 

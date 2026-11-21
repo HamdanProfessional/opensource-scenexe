@@ -2,38 +2,17 @@
 
   const View = (function() {
     const View = {
-      sliceWidth: 250,
       cellSize: 512,
-      rules: {
-        fov: {
-          bullet: true,
-        },
-        bullet: {
-          fov: true
-        }
+      attach: function(fovObject, visible, bullets, polygons) {
+        const viewer = fovObject.object
+        viewer.fov.bullets = bullets
+        viewer.fov.polygons = polygons
+        viewer.fovVisible = visible
       },
-      canCollide: function(objectA, objectB) {
-        return View.rules[objectA.type][objectB.type]
-      },
-      checkCircle: function(objectA, objectB) {
-        const data = {
-          dx: objectA.x - objectB.x,
-          dy: objectA.y - objectB.y,
-          distance: 0,
-          size: objectA.size + objectB.size,
-          colliding: true
-        }
-        if(data.dx === 0 && data.dy === 0) {
-          data.dy = 1
-        }
-        return data
-      },
-      native: native && native.view ? native : null,
       _native: null,
       collect: function(objects, limit) {
-        if(!View.native) { return false }
-        const slices = limit >= 0 ? Math.ceil(limit / Detector.sliceWidth) : -1
-        if(slices > 1000000) { return false }
+        const slices = sliceCount(limit)
+        if(!native || slices > maxSlices) { return false }
         const n = objects.length
         let buf = View._native
         if(!buf || buf.size < n) {
@@ -62,14 +41,17 @@
             kind[i] = 0
           }
         }
-        let total = View.native.view(n, geo, kind, list, ids, slices, View.sliceWidth, View.cellSize, buf.offsets, buf.out)
-        if(total > buf.out.length) {
-          buf.out = new Int32Array(total * 2)
-          total = View.native.view(n, geo, kind, list, ids, slices, View.sliceWidth, View.cellSize, buf.offsets, buf.out)
-        }
+        let total
+        try {
+          total = native.view(n, geo, kind, list, ids, slices, sliceWidth, View.cellSize, buf.offsets, buf.out)
+          if(total > buf.out.length) {
+            buf.out = new Int32Array(total * 2)
+            total = native.view(n, geo, kind, list, ids, slices, sliceWidth, View.cellSize, buf.offsets, buf.out)
+          }
+        } catch(e) { return false }
         const offsets = buf.offsets, out = buf.out
         for(let f=0;f<fovs.length;f++) {
-          const fovObject = fovs[f], fov = fovObject.fov, viewer = fovObject.object
+          const fovObject = fovs[f]
           const visible = {}, bullets = [], polygons = []
           for(let p=offsets[f],end=offsets[f + 1];p<end;p++) {
             const item = objects[out[p]], c = item.object, str = item.str
@@ -79,20 +61,15 @@
               bullets.push(c)
             } else if(str === 'polygons') {
               polygons.push(c)
-            } else {
-              fov[str][c.id] = c
             }
           }
-          fov.tanks = visible
-          viewer.fov.bullets = bullets
-          viewer.fov.polygons = polygons
-          viewer.fovVisible = visible
+          View.attach(fovObject, visible, bullets, polygons)
         }
         return true
       },
       _wake: null,
       awake: function(polygons, wake) {
-        if(!View.native || !View.native.wake) { return null }
+        if(!native) { return null }
         const n = polygons.length, count = wake.length >> 2
         let buf = View._wake
         if(!buf || buf.size < n || buf.wakeSize < count) {
@@ -107,14 +84,12 @@
           p[j + 2] = polygon.size
         }
         buf.wake.set(wake)
-        View.native.wake(n, p, count, buf.wake, buf.out)
+        native.wake(n, p, count, buf.wake, buf.out)
         return buf.out
       },
       detectCollisions: function(objects, callback, limit) {
-        const inverse = 1 / View.sliceWidth
-        if(limit >= 0) {
-		      limit = Math.ceil(limit / Detector.sliceWidth)
-	      } else { limit = -1 }
+        const inverse = 1 / sliceWidth
+        limit = sliceCount(limit)
         const outside = function(left, right) {
           if(limit < 0) { return false }
           let min = 1 + Math.floor(left * inverse)
@@ -154,8 +129,6 @@
             }
           }
         }
-        let count = 0
-        const data = { colliding: true }
         for(let f=0,fl=fovs.length;f<fl;f++) {
           const fov = fovs[f]
           const cx0 = Math.floor(fov.left * invCell), cx1 = Math.floor(fov.right * invCell)
@@ -168,15 +141,13 @@
                 const test = bucket[i]
                 if(test.viewStamp === f) { continue }
                 test.viewStamp = f
-                count ++
                 if(fov.right >= test.left && fov.left <= test.right && fov.bottom <= test.top && test.bottom <= fov.top) {
-                  callback(fov, test, data)
+                  callback(fov, test)
                 }
               }
             }
           }
         }
-        return count
       }
     }
     return View

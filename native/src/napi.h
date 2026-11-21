@@ -40,10 +40,8 @@ NAPI_IMPORT napi_status napi_get_typedarray_info(napi_env env, napi_value typeda
 NAPI_IMPORT napi_status napi_get_value_double(napi_env env, napi_value value, double *result);
 NAPI_IMPORT napi_status napi_get_value_int32(napi_env env, napi_value value, int32_t *result);
 NAPI_IMPORT napi_status napi_create_int32(napi_env env, int32_t value, napi_value *result);
-NAPI_IMPORT napi_status napi_create_double(napi_env env, double value, napi_value *result);
 NAPI_IMPORT napi_status napi_create_function(napi_env env, const char *name, size_t length, napi_callback cb, void *data, napi_value *result);
 NAPI_IMPORT napi_status napi_set_named_property(napi_env env, napi_value object, const char *name, napi_value value);
 NAPI_IMPORT napi_status napi_throw_error(napi_env env, const char *code, const char *message);
-NAPI_IMPORT napi_status napi_get_undefined(napi_env env, napi_value *result);
 
 #endif

@@ -371,24 +371,12 @@
         }
       }
       if(options.netUpdate && fovs.length > 0 && !View.collect(viewObjects, dim.mapSize)) {
-        View.detectCollisions(viewObjects, function(objectA, objectB, data) {
-          if(objectB.type === 'fov') {
-            [objectA, objectB] = [objectB, objectA]
-          } if(objectA.type === 'fov') {
-            let fov = objectA.fov
-            let c = objectB.object
-            if(objectB.type === 'bullet') {
-              fov[objectB.str][c.id] = c
-            }
-          }
+        View.detectCollisions(viewObjects, function(fovObject, seen) {
+          fovObject.fov[seen.str][seen.object.id] = seen.object
         }, dim.mapSize)
         for(let i=fovs.length-1;i>=0;i--) {
           let f = fovs[i]
-          let o = f.object
-
-          o.fov.bullets = Object.values(f.fov.bullets)
-          o.fov.polygons = Object.values(f.fov.polygons)
-          o.fovVisible = f.fov.tanks
+          View.attach(f, f.fov.tanks, Object.values(f.fov.bullets), Object.values(f.fov.polygons))
         }
       }
       for(let i in dim.wormholes) {

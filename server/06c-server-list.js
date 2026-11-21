@@ -1,3 +1,5 @@
+const dns = require('dns').promises
+
 const serverList = (function() {
   const settings = Object.assign({ name: '', address: '', hub: 'http://144.91.117.163:22440' }, config.serverList || {})
   const hub = String(settings.hub || '').replace(/\/+$/, '')
@@ -24,7 +26,7 @@ const serverList = (function() {
     return { game: 'open-scenexe', name: settings.name ? cleanServerName(settings.name) : '', players: totalPlayers() }
   }
 
-  const blocked = (function() {
+  const unsafeTargets = (function() {
     const list = new net.BlockList()
     const ranges = [
       ['0.0.0.0', 8, 'ipv4'], ['10.0.0.0', 8, 'ipv4'], ['100.64.0.0', 10, 'ipv4'], ['127.0.0.0', 8, 'ipv4'], ['169.254.0.0', 16, 'ipv4'],
@@ -34,15 +36,6 @@ const serverList = (function() {
     for(const r of ranges) { list.addSubnet(r[0], r[1], r[2]) }
     return list
   })()
-
-  const publicAddress = async function(host) {
-    const found = await require('dns').promises.lookup(host, { all: true })
-    if(!found.length) { throw new Error('no address') }
-    for(const f of found) {
-      if(blocked.check(f.address, f.family === 6 ? 'ipv6' : 'ipv4')) { throw new Error('private address') }
-    }
-    return found[0]
-  }
 
   const getJson = function(target, host, port) {
     return new Promise(function(resolve, reject) {
@@ -73,7 +66,12 @@ const serverList = (function() {
     const [host, portText] = address.split(':')
     const port = portText ? Number(portText) : 80
     if(!(port > 0 && port < 65536)) { throw new Error('bad port') }
-    const target = await publicAddress(host)
+    const found = await dns.lookup(host, { all: true })
+    if(!found.length) { throw new Error('no address') }
+    for(const f of found) {
+      if(unsafeTargets.check(f.address, f.family === 6 ? 'ipv6' : 'ipv4')) { throw new Error('private address') }
+    }
+    const target = found[0]
     const data = await getJson(target, host, port)
     if(!data || data.game !== 'open-scenexe') { throw new Error('not an Open-Scenexe server') }
     return data

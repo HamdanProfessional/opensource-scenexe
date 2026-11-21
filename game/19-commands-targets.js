@@ -32,6 +32,15 @@
             }
           }
           return list
+        case 'boss':
+        case 'bosses':
+          for(let i=tanks.length-1;i>=0;i--) {
+            let t = tanks[i]
+            if(t.boss === true) {
+              list.push(t)
+            }
+          }
+          return list
         case 'pinks':
         case 'celes':
         case 'celestials':
@@ -210,6 +219,10 @@
             return { ok: false, error: 'Missing a word' }
           }
           items.push(text)
+        } else if(type === '?') {
+          items.push(data.join(' '))
+          data = []
+          break
         } else if(type === '*') {
           if(data.length === 0) {
             return { ok: false, error: 'Missing text' }

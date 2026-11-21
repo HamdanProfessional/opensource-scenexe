@@ -13,12 +13,7 @@ static uint32_t hash_id(double id)
     id = 0;
   }
   memcpy(&bits, &id, sizeof bits);
-  bits ^= bits >> 33;
-  bits *= 0xff51afd7ed558ccdULL;
-  bits ^= bits >> 33;
-  bits *= 0xc4ceb9fe1a85ec53ULL;
-  bits ^= bits >> 33;
-  return (uint32_t)bits;
+  return (uint32_t)mix64(bits);
 }
 
 static int32_t find(const int32_t *index, uint32_t mask, const double *entries, int32_t count, double id)
@@ -109,9 +104,6 @@ napi_value js_pick(napi_env env, napi_callback_info info)
   seq = args_num(&a, 7);
   keyframe = args_num(&a, 8);
   seq_time = args_num(&a, 9);
-  if(a.failed) {
-    return NULL;
-  }
   if(count < 0) {
     return args_fail(&a, "bad pick count");
   }

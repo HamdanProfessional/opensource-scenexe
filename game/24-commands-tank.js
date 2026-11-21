@@ -249,18 +249,12 @@
         }]
       ],
       kick: [
-        [['targets'], function(data, tank, ws) {
-          commands.kick(data[0], tank, ws, '')
-        }],
-        [['targets', '*'], function(data, tank, ws) {
+        [['targets', '?'], function(data, tank, ws) {
           commands.kick(data[0], tank, ws, data[1])
         }]
       ],
       ban: [
-        [['targets'], function(data, tank, ws) {
-          commands.ban(data[0], tank, ws, '')
-        }],
-        [['targets', '*'], function(data, tank, ws) {
+        [['targets', '?'], function(data, tank, ws) {
           commands.ban(data[0], tank, ws, data[1])
         }]
       ],
@@ -275,17 +269,14 @@
         }]
       ],
       mute: [
-        [['targets'], function(data, tank, ws) {
-          commands.mute(data[0], tank, ws, '')
-        }],
-        [['targets', '*'], function(data, tank, ws) {
+        [['targets', '?'], function(data, tank, ws) {
           commands.mute(data[0], tank, ws, data[1])
         }]
       ],
       unmute: [
         [['*'], function(data, tank, ws) {
           let found = commands.getTargets(data[0], tank) || [], t = found.length === 1 ? found[0] : false
-          let uid = t && t.ws && t.ws.data && t.ws.data.isPlayer && t.ws.data.uid >= 0 ? t.ws.data.uid : -1
+          let uid = dimension.isOnline(t) ? t.ws.data.uid : -1
           commands.toServer(ws, 'unmute', [data[0], ws.data.uid, uid])
         }]
       ],

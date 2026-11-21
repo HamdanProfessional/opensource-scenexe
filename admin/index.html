@@ -41,12 +41,11 @@
       <div class="card stat"><span class="muted">Players</span><strong id="statPlayers">-</strong><span id="statMenu" class="muted small"></span></div>
       <div class="card stat"><span class="muted">CPU</span><strong id="statCpu">-</strong><span class="muted small">of one core</span></div>
       <div class="card stat"><span class="muted">Memory</span><strong id="statMemory">-</strong><span class="muted small">whole server</span></div>
-      <div class="card stat"><span class="muted">Up for</span><strong id="statUptime">-</strong><span id="statLocked" class="muted small"></span></div>
+      <div class="card stat"><span class="muted">Up for</span><strong id="statUptime">-</strong></div>
     </div>
     <div class="card">
-      <div class="row"><h2>Tick time, last 20 minutes</h2><span class="muted small">A tick has 16.7 ms before the game slows down.</span></div>
-      <svg id="chart" class="chart" viewBox="0 0 720 200" role="img" aria-label="Tick time per dimension"></svg>
-      <div id="legend" class="legend"></div>
+      <div class="row"><h2>Tick time, last 20 minutes</h2><span class="muted small">Slowest tick every 5 seconds. The dashed line is the 16.7 ms budget.</span></div>
+      <svg id="chart" class="chart" viewBox="0 0 720 200" role="img" aria-label="Slowest tick over time"></svg>
     </div>
   </section>
 
@@ -69,7 +68,7 @@
     </form>
   </section>
 
-  <section class="card" id="mutesBox">
+  <section class="card">
     <h2>Mutes</h2>
     <div class="scroll"><table id="mutes"></table></div>
   </section>
@@ -96,20 +95,20 @@
       </select>
       <button type="submit" class="quiet">Apply</button>
     </form>
-    <p class="muted small">A new role applies when they rejoin or change dimension.</p>
+    <p class="muted small">Applies when they rejoin.</p>
   </section>
 </div>
 
 <dialog id="confirm">
-  <form id="confirmForm" method="dialog">
+  <form method="dialog">
     <h2 id="confirmTitle"></h2>
     <p id="confirmText"></p>
     <label id="durationField">How long <input id="confirmDuration" maxlength="20" placeholder="30m, 2h, 7d or perm"></label>
     <label id="reasonField">Reason <input id="confirmReason" maxlength="200" placeholder="Shown to them and in the logs"></label>
     <label id="typeField">Type <b id="typeWord"></b> to confirm <input id="confirmType" maxlength="60" autocomplete="off"></label>
     <div class="row end">
-      <button value="cancel" class="quiet" formnovalidate>Cancel</button>
       <button id="confirmGo" value="go" class="danger">Confirm</button>
+      <button value="cancel" class="quiet">Cancel</button>
     </div>
   </form>
 </dialog>

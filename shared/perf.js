@@ -16,21 +16,21 @@ const uptime = function(seconds) {
   return `${m}m`
 }
 
-const dimRow = function(name, s, label) {
-  s = s || []
+const dimRow = function(name, stats, label) {
+  let s = stats || {}
   return {
     name: name,
     label: label || name,
-    players: s[0] || 0,
-    tps: s[1] || 0,
-    tanks: s[5] || 0,
-    bullets: s[6] || 0,
-    shapes: s[7] || 0,
-    avg: s[8] || 0,
-    peak: s[9] || 0,
-    net: s[10] || 0,
-    top: Array.isArray(s[11]) ? s[11] : [],
-    paused: s[12] === true || !(s[1] > 0)
+    players: s.players || 0,
+    tps: s.tps || 0,
+    tanks: s.tanks || 0,
+    bullets: s.bullets || 0,
+    shapes: s.shapes || 0,
+    avg: s.avg || 0,
+    peak: s.peak || 0,
+    net: s.net || 0,
+    top: Array.isArray(s.top) ? s.top : [],
+    paused: s.paused === true || !(s.tps > 0)
   }
 }
 
@@ -65,4 +65,4 @@ const lines = function(report) {
   return out
 }
 
-module.exports = { lines, dimRow, slow, uptime, TICK_BUDGET }
+module.exports = { lines, dimRow, slow, uptime }

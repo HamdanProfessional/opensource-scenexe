@@ -1,6 +1,11 @@
+  const sliceWidth = 250
+  const maxSlices = 1000000
+  const sliceCount = function(limit) {
+    return limit >= 0 ? Math.ceil(limit / sliceWidth) : -1
+  }
+
   const Detector = (function() {
     const Detector = {
-      sliceWidth: 250,
       rules: {
         tank: {
           tank: true,
@@ -53,39 +58,6 @@
           bullet: true,
           polygon: true,
         }
-      },
-      canCollide: function(objectA, objectB) {
-        if(objectA.noCollide || objectB.noCollide) { return false }
-        if(objectA.type === 'bullet' && objectB.type === 'bullet') {
-          if(dimension.isSameTeam(objectA.object, objectB.object)) {
-            if(objectA.object.type === objectB.object.type) {
-              return true
-            } else {
-              return false
-            }
-          } else {
-            return true
-          }
-        }
-        return Detector.rules[objectA.type][objectB.type]
-      },
-      checkCircle: function(objectA, objectB) {
-        const data = {
-          dx: objectA.x - objectB.x,
-          dy: objectA.y - objectB.y,
-          distance: 0,
-          size: objectA.size + objectB.size,
-          colliding: false
-        }
-        data.distance = data.dx * data.dx + data.dy * data.dy
-
-        if(data.distance < data.size * data.size) {
-          data.colliding = true
-        }
-        if(data.dx === 0 && data.dy === 0) {
-          data.dy = 1
-        }
-        return data
       },
       checkRect: function(rect, circle) {
         if(circle.rectangular) {
@@ -155,6 +127,8 @@
             R: new Float64Array(cap),
             B: new Float64Array(cap),
             T: new Float64Array(cap),
+            LOW: new Int32Array(cap),
+            HIGH: new Int32Array(cap),
             SMIN: new Int32Array(cap),
             TYPE: new Uint8Array(cap),
             included: b ? b.included : [],
@@ -163,7 +137,21 @@
         }
         return b
       },
-      native: native && native.collide ? native : null,
+      ignoredBullets: function(object, test) {
+        const oa = object.object, ob = test.object
+        if(dimension.isSameTeam(oa, ob) && oa.type !== ob.type) { return true }
+        const ca = dimension.bulletClass[oa.type], cb = dimension.bulletClass[ob.type]
+        return !(ca === cb && ca !== 0) && dimension.isSameTeam(oa.parent, ob.parent)
+      },
+      emitRect: function(object, test, callback) {
+        const data = Detector.checkRect(object, test)
+        if(data.colliding) {
+          callback(data.circle, data.rect, data)
+        }
+      },
+      emitCircle: function(object, test, callback, dx, dy, distance, size) {
+        callback(object, test, { dx: dx, dy: dy, distance: distance, size: size, colliding: true })
+      },
       _native: null,
       detectNative: function(objects, callback, slices) {
         const n = objects.length
@@ -193,41 +181,31 @@
           kind[i * 2] = (code === undefined || object.noCollide) ? 255 : code
           kind[i * 2 + 1] = object.rectangular ? 1 : 0
         }
-        let pairs = Detector.native.collide(n, geo, kind, slices, Detector.sliceWidth, Detector.pairRules, Detector.typeCount, buf.pairs)
+        let pairs = native.collide(n, geo, kind, slices, sliceWidth, Detector.pairRules, Detector.typeCount, buf.pairs)
         if(pairs * 7 > buf.pairs.length) {
           buf.pairs = new Float64Array(pairs * 14)
-          pairs = Detector.native.collide(n, geo, kind, slices, Detector.sliceWidth, Detector.pairRules, Detector.typeCount, buf.pairs)
+          pairs = native.collide(n, geo, kind, slices, sliceWidth, Detector.pairRules, Detector.typeCount, buf.pairs)
         }
         const out = buf.pairs
         for(let p=0;p<pairs;p++) {
           const j = p * 7
           const object = objects[out[j]], test = objects[out[j + 1]]
-          if(object.type === 'bullet' && test.type === 'bullet') {
-            const oa = object.object, ob = test.object
-            if(dimension.isSameTeam(oa, ob) && oa.type !== ob.type) { continue }
-            const ca = dimension.bulletClass[oa.type], cb = dimension.bulletClass[ob.type]
-            if(!(ca === cb && ca !== 0) && dimension.isSameTeam(oa.parent, ob.parent)) { continue }
-          }
+          if(object.type === 'bullet' && test.type === 'bullet' && Detector.ignoredBullets(object, test)) { continue }
           if(out[j + 2]) {
-            const data = Detector.checkRect(object, test)
-            if(data.colliding) {
-              callback(data.circle, data.rect, data)
-            }
+            Detector.emitRect(object, test, callback)
           } else {
-            callback(object, test, { dx: out[j + 3], dy: out[j + 4], distance: out[j + 5], size: out[j + 6], colliding: true })
+            Detector.emitCircle(object, test, callback, out[j + 3], out[j + 4], out[j + 5], out[j + 6])
           }
         }
-        return pairs
       },
       detectCollisions: function(objects, callback, limit) {
-        if(Detector.native && limit >= 0 && limit / Detector.sliceWidth <= 1000000) {
-          return Detector.detectNative(objects, callback, Math.ceil(limit / Detector.sliceWidth))
+        limit = sliceCount(limit)
+        if(native && limit >= 0 && limit <= maxSlices) {
+          Detector.detectNative(objects, callback, limit)
+          return
         }
-        const inverse = 1 / Detector.sliceWidth
+        const inverse = 1 / sliceWidth
         let objectsLength = objects.length
-	      if(limit >= 0) {
-		      limit = Math.ceil(limit / Detector.sliceWidth)
-	      } else { limit = -1 }
 
         const buf = Detector.buffers(objectsLength)
         const included = buf.included
@@ -243,7 +221,6 @@
           object.top = object.y + h
           object.w = w
           object.h = h
-          object.internalId = i
           let min = 1 + Math.floor(object.left * inverse)
           let max = 1 + Math.floor(object.right * inverse)
           if(limit >= 0) {
@@ -251,8 +228,8 @@
             if(max > limit) { max = limit }
             if(min < 1 - limit) { min = 1 - limit }
           }
-          object.sliceMin = min
-          object.sliceMax = max
+          buf.LOW[included.length] = min
+          buf.HIGH[included.length] = max
           included.push(object)
         }
         const n = included.length
@@ -266,19 +243,20 @@
 
         const sorted = buf.sorted
         sorted.length = n
-        const L = buf.L, R = buf.R, B = buf.B, T = buf.T, SMIN = buf.SMIN, TYPE = buf.TYPE
+        const L = buf.L, R = buf.R, B = buf.B, T = buf.T, LOW = buf.LOW, HIGH = buf.HIGH, SMIN = buf.SMIN, TYPE = buf.TYPE
         const slices = new Map()
         for(let k=0;k<n;k++) {
-          const object = included[orderView[k]]
+          const at = orderView[k]
+          const object = included[at]
           sorted[k] = object
           L[k] = object.left
           R[k] = object.right
           B[k] = object.bottom
           T[k] = object.top
-          SMIN[k] = object.sliceMin
+          SMIN[k] = LOW[at]
           const code = typeCodes[object.type]
           TYPE[k] = (code === undefined || object.noCollide) ? 255 : code
-          for(let i=object.sliceMin,max=object.sliceMax;i<=max;i++) {
+          for(let i=LOW[at],max=HIGH[at];i<=max;i++) {
             let slice = slices.get(i)
             if(slice) {
               slice.push(k)
@@ -288,7 +266,6 @@
           }
         }
         const pairRules = Detector.pairRules, typeCount = Detector.typeCount, bulletCode = typeCodes.bullet
-        let count = 0
 
         for(const [sliceId, slice] of slices) {
           const l = slice.length - 1
@@ -302,7 +279,6 @@
 
             for(let u=i+1;u<=l;u++) {
               const b = slice[u]
-              count ++
               if(B[b] > top) {
                 break
               }
@@ -311,19 +287,11 @@
               if(typeB === 255 || !pairRules[ruleRow + typeB]) { continue }
               if((sminA > SMIN[b] ? sminA : SMIN[b]) !== sliceId) { continue }
               const object = sorted[a], test = sorted[b]
-              if(typeA === bulletCode && typeB === bulletCode) {
-                const oa = object.object, ob = test.object
-                if(dimension.isSameTeam(oa, ob) && oa.type !== ob.type) { continue }
-                const ca = dimension.bulletClass[oa.type], cb = dimension.bulletClass[ob.type]
-                if(!(ca === cb && ca !== 0) && dimension.isSameTeam(oa.parent, ob.parent)) { continue }
-              }
+              if(typeA === bulletCode && typeB === bulletCode && Detector.ignoredBullets(object, test)) { continue }
 
               if(object.rectangular || test.rectangular) {
                 if(object.rectangular ^ test.rectangular) {
-                  const data = Detector.checkRect(object, test)
-                  if(data.colliding) {
-                    callback(data.circle, data.rect, data)
-                  }
+                  Detector.emitRect(object, test, callback)
                 }
               } else {
                 let dx = object.x - test.x, dy = object.y - test.y
@@ -331,13 +299,12 @@
                 const distance = dx * dx + dy * dy
                 if(distance < size * size) {
                   if(dx === 0 && dy === 0) { dy = 1 }
-                  callback(object, test, { dx: dx, dy: dy, distance: distance, size: size, colliding: true })
+                  Detector.emitCircle(object, test, callback, dx, dy, distance, size)
                 }
               }
             }
           }
         }
-        return count
       }
     }
     Detector.pairRules = new Uint8Array(Detector.typeCount * Detector.typeCount)

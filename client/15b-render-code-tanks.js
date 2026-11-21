@@ -53,10 +53,10 @@
         return {
           name: tree.name,
           rgb: render.codeColor(tree.color),
-          reach: tree.reach || 1,
-          shots: tree.shots || [],
+          reach: tree.reach,
+          shots: tree.shots,
           main: flatten(tree.render),
-          looks: (tree.looks || []).map(flatten)
+          looks: tree.looks.map(flatten)
         }
       },
       codeFill: function(rgb, inherited, top) {
@@ -70,30 +70,6 @@
         if(a < -Math.PI) { a += 2 * Math.PI }
         return a
       },
-      codeSynced: function(tank, node, local, facing) {
-        let data = tank.turretData && tank.turretData[(tank._turrets ? tank._turrets.length : 0) + node.sync]
-        if(!data || !(data._d >= 0 || data._d <= 0)) { return local }
-        if(data.codeFrame !== render.now) {
-          data.codeFrame = render.now
-          let miss = render.codeWrap(data._d - facing + Math.PI / 2 - local)
-          data.codeOffset = data.codeOffset === undefined ? miss : data.codeOffset + render.codeWrap(miss - data.codeOffset) * 0.2
-        }
-        return local + data.codeOffset
-      },
-      codeAngle: function(node, parentAngle, tank, facing, time) {
-        let free = node.relative === 'none', local
-        if(node.turn === 'constant') {
-          let spin = node.d + node.speed * time
-          local = free ? spin - facing : parentAngle + spin
-        } else if(node.turn === 'mouse') {
-          local = node.d
-        } else if(node.turn === 'auto') {
-          local = parentAngle + node.rest
-        } else {
-          local = free ? node.d - facing : parentAngle + node.d
-        }
-        return node.sync >= 0 ? render.codeSynced(tank, node, local, facing) : local
-      },
       drawCodeTree: function(flat, tank, scale, color, facing, base) {
         let items = flat.items, frames = flat.frames, time = render.now / 1000
         let top = { a: base.a, b: base.b, c: base.c, d: base.d, e: base.e, f: base.f, x: 0, y: 0, angle: 0, k: 1, color: color }
@@ -106,7 +82,27 @@
           f.x = p.x + p.k * (node.x * pc - node.y * ps)
           f.y = p.y + p.k * (node.x * ps + node.y * pc)
           f.k = p.k * node.size
-          f.angle = render.codeAngle(node, p.angle, tank, facing, time)
+          let free = node.relative === 'none', angle
+          if(node.turn === 'constant') {
+            let spin = node.d + node.speed * time
+            angle = free ? spin - facing : p.angle + spin
+          } else if(node.turn === 'mouse') {
+            angle = node.d
+          } else if(node.turn === 'auto') {
+            angle = p.angle + node.rest
+          } else {
+            angle = free ? node.d - facing : p.angle + node.d
+          }
+          let synced = node.sync >= 0 && tank.turretData && tank.turretData[tank._turrets.length + node.sync]
+          if(synced && (synced._d >= 0 || synced._d <= 0)) {
+            if(synced.codeFrame !== render.now) {
+              synced.codeFrame = render.now
+              let miss = render.codeWrap(synced._d - facing + Math.PI / 2 - angle)
+              synced.codeOffset = synced.codeOffset === undefined ? miss : synced.codeOffset + render.codeWrap(miss - synced.codeOffset) * 0.2
+            }
+            angle += synced.codeOffset
+          }
+          f.angle = angle
           f.color = render.codeFill(node.rgb, p.color, color)
           let s = Math.sin(f.angle), c = Math.cos(f.angle), tx = f.x * scale, ty = f.y * scale
           f.a = base.a * c + base.c * s
@@ -179,9 +175,8 @@
         ctx.fill()
         if(render.codeStroke(node, fill)) { ctx.stroke() }
       },
-      codeBarrelShapes: { bullet: 0, custom: 0, trap: 1, drone: 2 },
       drawCodeBarrel: function(node, k, fill) {
-        let shape = render.barrelData[render.codeBarrelShapes[node.kind] || 0]
+        let shape = render.barrelData[node.shape]
         if(!shape || !shape[0]) { return }
         let s = Math.sin(node.d), c = Math.cos(node.d)
         let bx = (node.x * c - node.y * s) * k, by = (node.x * s + node.y * c) * k
@@ -240,16 +235,14 @@
         if(!tank || !tank.code) { return null }
         let code = render.codeTank(tank.code)
         if(!code) { return null }
-        return code.shots[barrelId - (tank._barrels ? tank._barrels.length : 0)] || null
+        return code.shots[barrelId - tank._barrels.length] || null
       },
       drawCodeBullet: function(bullet) {
         let code = render.codeTank(bullet.code)
         let look = code && code.looks[bullet.codeLook]
         if(!look) { return false }
         let m = ctx.getTransform()
-        let fade = bullet.fadeTime
-        let alpha = fade <= 1 ? fade : 2 - fade
-        if(alpha < 1) { ctx.globalAlpha = alpha * render.drawAlpha }
+        render.scaleFade(bullet.fadeTime, false)
         ctx.translate(bullet.x, bullet.y)
         ctx.rotate(bullet.d)
         let t = ctx.getTransform()
@@ -263,8 +256,7 @@
         let code = render.codeTank(tank.code)
         if(!code) { return false }
         let m = ctx.getTransform()
-        let s = Math.sin(Math.PI / 2), c = Math.cos(Math.PI / 2)
-        let base = { a: m.a * c + m.c * s, b: m.b * c + m.d * s, c: m.c * c - m.a * s, d: m.d * c - m.b * s, e: m.e, f: m.f }
+        let base = { a: m.c, b: m.d, c: -m.a, d: -m.b, e: m.e, f: m.f }
         render.drawCodeTree(code.main, tank, tank.size, color || code.rgb, (tank.d || 0) + Math.PI / 2, base)
         ctx.setTransform(m)
         return true

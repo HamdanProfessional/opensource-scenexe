@@ -4,8 +4,6 @@ const accountToObject = function(a) {
 	return o
 }
 
-
-
 const zlib = require('zlib')
 const compressible = /^(text\/|application\/(javascript|json)|image\/svg)/
 const compressResponse = function(req, res) {
@@ -49,24 +47,7 @@ const compressResponse = function(req, res) {
   }
 }
 
-const tickets = {
-  seen: {},
-  take: function(ip) {
-    const now = performance.now()
-    const key = ipGroup(ip)
-    const list = (tickets.seen[key] || []).filter(function(t) { return t > now - 60000 })
-    list.push(now)
-    tickets.seen[key] = list
-    return list.length > 30
-  }
-}
-
-setInterval(function() {
-  const cutoff = performance.now() - 60000
-  for(const key in tickets.seen) {
-    if(!tickets.seen[key].some(function(t) { return t > cutoff })) { delete tickets.seen[key] }
-  }
-}, 60000)
+const tickets = hitCounter(60000)
 
 const securityHeaders = {
   'X-Content-Type-Options': 'nosniff',
@@ -140,7 +121,7 @@ const app = function(req, res) {
         res.end(getScript());
         break;
       case '/ticket':
-        if(tickets.take(ip)) {
+        if(tickets.add(ipGroup(ip)) > 30) {
           res.writeHead(429, {'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*', 'Retry-After': '5'});
           res.end('{}');
           return
@@ -266,7 +247,7 @@ const app = function(req, res) {
   if(banned[ip] === true) {
     if(debug) console.log('banned', pathname, ip)
     res.writeHead(403, {'Content-Type': 'text/plain; charset=utf-8'});
-    res.end(`${banMessage(banDetails[ip])}. If you think this is a mistake, ask on the Discord.`)
+    res.end(banMessage(banDetails[ip]))
     return
   }
   serveRequest()

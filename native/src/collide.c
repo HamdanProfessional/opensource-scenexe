@@ -68,9 +68,6 @@ napi_value js_collide(napi_env env, napi_callback_info info)
   limit = args_int(&a, 3);
   width = args_num(&a, 4);
   type_count = args_int(&a, 6);
-  if(a.failed) {
-    return NULL;
-  }
   if(n < 0 || limit < 0 || limit > 1000000 || type_count < 1 || type_count > 254 || !(width > 0)) {
     return args_fail(&a, "bad collide arguments");
   }

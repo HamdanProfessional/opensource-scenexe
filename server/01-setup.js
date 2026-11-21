@@ -57,9 +57,9 @@ const envNum = function(name) { return process.env[name] !== undefined && proces
 let debug = envNum('DEBUG') ?? config.debug ?? 1
 let fobs = envNum('OBFUSCATE') ?? config.obfuscate ?? 0
 console.log(debug ? 'Running on debug mode' : 'Running on normal mode')
-if(config.native === false || process.env.NATIVE === '0') {
+if(envNum('NATIVE') === 0 || config.native === false) {
   process.env.NATIVE = '0'
-  console.log('native: C modules turned off, using JavaScript')
+  console.log('native: off')
 } else {
   try { require('./native/build.js').build() } catch(e) { console.log('native: ' + e.message) }
 }

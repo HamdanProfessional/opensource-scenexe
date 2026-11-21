@@ -5,14 +5,14 @@
     },
     info: {
       help:            ['player', 'General',    '/help [command]',                 'Lists the commands you can use, or explains one command.'],
-      report:          ['player', 'General',    '/report <player> <reason>',       'Tells the moderators about a player breaking the rules.'],
+      report:          ['player', 'General',    '/report <player> <reason>',       'Reports a player to the moderators.'],
 
       kick:            ['mod',    'Moderation', '/kick <player> [reason]',         'Disconnects a player. They can join again.'],
       mute:            ['mod',    'Moderation', '/mute <player> [time] [reason]',  'Stops a player from chatting, e.g. /mute bob 30m spam. Default 10m, perm for forever.'],
       unmute:          ['mod',    'Moderation', '/unmute <player or name>',        'Lets a muted player chat again.'],
       mutes:           ['mod',    'Moderation', '/mutes',                          'Lists muted players.'],
-      whois:           ['mod',    'Moderation', '/whois <player>',                 'Shows a player\'s account, time in game and other connections from their network.'],
-      perf:            ['mod',    'Moderation', '/perf',                           'Shows how hard the server is working: tick times, bullets, CPU and memory.'],
+      whois:           ['mod',    'Moderation', '/whois <player>',                 'Account, time in game and shared-network connections.'],
+      perf:            ['mod',    'Moderation', '/perf',                           'Tick times, bullets, CPU and memory.'],
       spectate:        ['mod',    'Moderation', '/spectate <player>',              'Leaves play and watches a player. Respawn to play again.'],
       remove:          ['mod',    'Moderation', '/remove <target>',                'Removes tanks or objects without a kill. Players go back to the menu.'],
       kill:            ['mod',    'Moderation', '/kill <target>',                  'Kills tanks or objects.'],
@@ -50,8 +50,9 @@
       send:            ['admin',  'Tank',       '/send [target] <dimension>',      'Sends tanks to another dimension, e.g. /send me void.'],
 
       bot:             ['admin',  'World',      '/bot <x y | target> <name>',      'Spawns an AI tank.'],
-      boss:            ['admin',  'World',      '/boss [boss] [x y | target]',     'Spawns a boss at your mouse: a boss like frost2, a family like frost, or random.'],
-      becomeboss:      ['admin',  'Tank',       '/becomeboss [target] <boss>',     'Turns into a boss, e.g. /becomeboss frost2 or /becomeboss magma.', 1],
+      boss:            ['admin',  'World',      '/boss [boss] [count] [x y | target]', 'Spawns bosses at your mouse, e.g. /boss frost titan, /boss colossus 3 or /boss rank2.'],
+      bosses:          ['admin',  'World',      '/bosses [family | here]',         'Lists the bosses, one family, or the ones alive here.'],
+      becomeboss:      ['admin',  'Tank',       '/becomeboss [target] <boss>',     'Turns into a boss, e.g. /becomeboss frosttitan or /becomeboss magma.', 1],
       tankcode:        ['admin',  'Tank',       '/tankcode [target] [code]',       'Turns into a tank from a tank code file. No code lists them.', 1],
       polygon:         ['admin',  'World',      '/polygon <sides> [count] [x y]',  'Spawns polygons.'],
       polyhedra:       ['admin',  'World',      '/polyhedra <1-5> [count] [x y]',  'Spawns polyhedra.'],
@@ -85,54 +86,68 @@
       '?': 'help', commands: 'help', list: 'help', cmds: 'help',
       ann: 'announce', gann: 'globalannounce', invincible: 'god', invisible: 'vanish',
       score: 'xp', teleport: 'tp', tank: 'weapon', dim: 'send', dimension: 'send', travel: 'send',
-      performance: 'perf', lag: 'perf', spec: 'spectate', watch: 'spectate', who: 'whois', banlist: 'bans', mutelist: 'mutes'
+      lag: 'perf'
+    },
+    hosted: function() {
+      return !!args.parentPort && !args.standalone
+    },
+    online: function(ws) {
+      if(commands.hosted()) { return true }
+      ws.sendPacket('announcement', 'That only works on the online server.')
+      return false
     },
     toServer: function(ws, type, data) {
-      if(!args.parentPort || args.standalone) {
-        ws.sendPacket('announcement', 'That only works on the online server.')
-        return false
-      }
+      if(!commands.online(ws)) { return false }
       args.parentPort.postMessage([type, data])
       return true
     },
     players: function(targets, tank) {
-      return targets.filter(t => t !== tank && t.ws && t.ws.data && t.ws.data.isPlayer && t.ws.data.uid >= 0)
+      return targets.filter(function(t) { return t !== tank && dimension.isOnline(t) })
     },
-    splitReason: function(text) {
+    splitReason: function(text, ws) {
       let words = String(text || '').trim().split(/\s+/).filter(w => w.length > 0)
-      for(const n of [2, 1]) {
+      for(let n=2;n>=1;n--) {
         let ms = words.length >= n ? durations.parse(words.slice(0, n).join(' ')) : null
         if(ms !== null) { return [ms, words.slice(n).join(' ')] }
+      }
+      if(/^\d/.test(words[0])) {
+        ws.sendPacket('announcement', `Unknown time '${words[0]}'.`)
+        return false
       }
       return [null, words.join(' ')]
     },
     kick: function(targets, tank, ws, reason) {
       let list = commands.players(targets, tank)
       if(!list.length) { return ws.sendPacket('announcement', 'No players to kick there.') }
-      for(const t of list) {
-        if(!commands.toServer(ws, 'kick', [t.ws.data.uid, ws.data.uid, reason])) { return }
+      if(!commands.online(ws)) { return }
+      for(let t of list) {
+        commands.toServer(ws, 'kick', [t.ws.data.uid, ws.data.uid, reason])
       }
       ws.sendPacket('announcement', `Kicked ${list.length} player${list.length > 1 ? 's' : ''}.`)
     },
     ban: function(targets, tank, ws, text) {
-      let [ms, reason] = commands.splitReason(text), list = commands.players(targets, tank)
+      let list = commands.players(targets, tank), split = commands.splitReason(text, ws)
+      if(!split) { return }
       if(!list.length) { return ws.sendPacket('announcement', 'No players to ban there.') }
-      for(const t of list) {
-        if(!commands.toServer(ws, 'ban', [t.ws.data.uid, ws.data.uid, t.name, ms, reason])) { return }
+      if(!commands.online(ws)) { return }
+      for(let t of list) {
+        commands.toServer(ws, 'ban', [t.ws.data.uid, ws.data.uid, t.name, split[0], split[1]])
       }
     },
     mute: function(targets, tank, ws, text) {
-      let [ms, reason] = commands.splitReason(text), list = commands.players(targets, tank)
+      let list = commands.players(targets, tank), split = commands.splitReason(text, ws)
+      if(!split) { return }
       if(!list.length) { return ws.sendPacket('announcement', 'No players to mute there.') }
-      for(const t of list) {
-        if(!commands.toServer(ws, 'mute', [t.ws.data.uid, ws.data.uid, ms, reason, t.name])) { return }
+      if(!commands.online(ws)) { return }
+      for(let t of list) {
+        commands.toServer(ws, 'mute', [t.ws.data.uid, ws.data.uid, split[0], split[1], t.name])
       }
     },
     whois: function(targets, tank, ws) {
       if(targets.length !== 1) { return ws.sendPacket('announcement', 'Pick one player, for example /whois bob.') }
       let t = targets[0]
       if(t.objectType !== 'tank') { return ws.sendPacket('announcement', 'That is not a player.') }
-      if(!(t.ws && t.ws.data && t.ws.data.isPlayer && t.ws.data.uid >= 0)) {
+      if(!dimension.isOnline(t)) {
         return ws.sendPacket('announcement', `${t.name || 'That tank'} is a bot (t${t.id}).`)
       }
       commands.toServer(ws, 'whois', [t.ws.data.uid, ws.data.uid, {
@@ -148,40 +163,35 @@
       let list = targets.filter(t => t !== tank && t.objectType === 'tank')
       if(list.length !== 1) { return ws.sendPacket('announcement', 'Pick one tank to watch, for example /spectate bob.') }
       let target = list[0], name = target.name || `t${target.id}`
-      let follow = target.ws && target.ws.data && target.ws.data.isPlayer && target.ws.data.uid >= 0 ? target.ws.data.uid : -1
+      let follow = dimension.isOnline(target) ? target.ws.data.uid : -1
       if(!ws.data.tank) {
         let s = ws.data.spectator
-        if(!s || s.dim !== target.dim) { return }
         s.target = target
         s.follow = follow
         return ws.sendPacket('announcement', `Watching ${name}.`)
       }
       let score = Math.round(tank.score)
       let stats = [score, tank.level, Math.round((Date.now() - (tank.spawnedAt || Date.now())) / 1000), tank.kills || 0]
-      let info = [[], score, stats, `Watching ${name}. Type /spectate <player> to switch, or respawn to play.`]
+      let info = [[], score, stats, `Watching ${name}. Respawn to stop.`]
       spectate.add(ws, tank.dim, tank, target)
       ws.data.spectator.staff = true
       ws.data.spectator.follow = follow
       tank.remove()
       ws.data.respawnScore = score
-      if(args.standalone || !args.parentPort) {
-        ws.sendPacket('death', info)
-      } else {
+      if(commands.hosted()) {
         ws.data.ready = false
         args.parentPort.postMessage(['death', [ws.data.uid, score, info, ws.data.lastTeam]])
+      } else {
+        ws.sendPacket('death', info)
       }
     },
     report: function(name, reason, tank, ws) {
-      let now = Date.now()
-      if(now - (ws.data.lastReport || 0) < 30000) { return ws.sendPacket('announcement', 'Please wait a little before sending another report.') }
-      let found = (commands.getTargets(name, tank) || []).filter(t => t !== tank && t.ws && t.ws.data && t.ws.data.isPlayer && t.ws.data.uid >= 0)
+      let found = commands.players(commands.getTargets(name, tank) || [], tank)
       if(found.length !== 1) {
         return ws.sendPacket('announcement', found.length ? 'That matches more than one player. Type more of their name.' : `No player here matches '${name}'.`)
       }
       let t = found[0]
-      if(commands.toServer(ws, 'report', [t.ws.data.uid, ws.data.uid, reason.slice(0, 300), tank.dim.name, t.name || '', tank.name || ''])) {
-        ws.data.lastReport = now
-      }
+      commands.toServer(ws, 'report', [t.ws.data.uid, ws.data.uid, reason.slice(0, 300), tank.dim.name, t.name || '', tank.name || ''])
     },
     spectatorCommands: ['spectate', 'perf', 'whois', 'kick', 'ban', 'unban', 'bans', 'mute', 'unmute', 'mutes', 'report'],
     asSpectator: function(ws, message) {
@@ -191,12 +201,79 @@
         return commands.spectatorCommands.indexOf(name) >= 0
       })
     },
-    spawnBoss: function(tank, ws, name, position) {
-      let id = generator.findBoss(name)
-      if(!id) { return ws.sendPacket('announcement', `There is no boss called '${name}'.`) }
+    spawnBoss: function(tank, ws, name, position, count) {
+      if(generator.bossMatches(name).length === 0) {
+        return ws.sendPacket('announcement', `There is no boss called '${name}'. Type /bosses to see them all.`)
+      }
       position = position || [tank.x, tank.y]
-      generator.boss(tank.dim, id, position[0], position[1])
-      ws.sendPacket('announcement', `Spawned ${tankData.bodies[id].boss.name} (${id.slice(5)}).`)
+      count = count || 1
+      let spawned = {}, spread = count > 1 ? 400 : 0
+      for(let i=0;i<count;i++) {
+        let id = generator.findBoss(name)
+        generator.boss(tank.dim, id, position[0] + (Math.random() - 0.5) * spread, position[1] + (Math.random() - 0.5) * spread)
+        let title = tankData.bodies[id].boss.name
+        spawned[title] = (spawned[title] || 0) + 1
+      }
+      let labels = Object.keys(spawned).map(n => spawned[n] > 1 ? `${n} x${spawned[n]}` : n)
+      ws.sendPacket('announcement', `Spawned ${labels.join(', ')}.`)
+    },
+    bossCommand: function(tank, ws, text) {
+      let words = String(text || '').split(/\s+/).filter(Boolean), name = []
+      while(words.length > 0 && isNaN(words[0])) { name.push(words.shift()) }
+      let count = 1, position = tank.mousePosition
+      if(words.length % 2 === 1 || (words.length > 1 && isNaN(words[1]))) { count = Number(words.shift()) }
+      if(!Number.isInteger(count) || count < 1 || count > 10) {
+        return ws.sendPacket('announcement', 'Count must be 1 to 10.')
+      }
+      if(words.length === 1) {
+        let found = commands.getTargets(words[0], tank) || []
+        if(found.length !== 1) { return ws.sendPacket('announcement', `Nobody matches '${words[0]}'.`) }
+        position = [found[0].x, found[0].y]
+      } else if(words.length === 2 && !isNaN(words[1])) {
+        position = [Number(words[0]), Number(words[1])]
+      } else if(words.length > 0) {
+        return ws.sendPacket('announcement', `Usage: ${commands.info.boss[2]}`)
+      }
+      commands.spawnBoss(tank, ws, name.join(' '), position, count)
+    },
+    listBosses: function(tank, ws, text) {
+      let key = generator.bossKey(text), lines = []
+      let capital = function(word) { return word[0].toUpperCase() + word.slice(1) }
+      let byRank = function(a, b) { return tankData.bodies[a].boss.rank - tankData.bodies[b].boss.rank || a.localeCompare(b, undefined, { numeric: true }) }
+      if(key === 'here') {
+        let alive = tank.dim.tanks.filter(t => t.boss === true && t.alive)
+        if(alive.length === 0) { return ws.sendPacket('announcement', 'No bosses are alive in this dimension.') }
+        lines.push(`Bosses alive here: ${alive.length}. /remove bosses clears them.`)
+        for(let t of alive.slice(0, 10)) {
+          let health = Math.max(0, Math.round(t.health / t.maxHealth * 100))
+          lines.push(`${t.name} at ${Math.round(t.x)}, ${Math.round(t.y)} with ${health}% health`)
+        }
+      } else {
+        let families = Object.create(null)
+        for(let id of generator.bossIds()) {
+          let family = tankData.bodies[id].boss.family
+          families[family] = families[family] || []
+          families[family].push(id)
+        }
+        let names = Object.keys(families).sort()
+        if(key && !families[key]) {
+          return ws.sendPacket('announcement', `There is no boss family called '${text}'. Families: ${names.join(', ')}.`)
+        }
+        if(key) {
+          lines.push(`${capital(key)} bosses:`)
+          for(let id of families[key].sort(byRank)) {
+            let body = tankData.bodies[id]
+            lines.push(`${body.boss.name} (${id.slice(5)}), rank ${body.boss.rank}, ${body.maxHealth}x health`)
+          }
+        } else {
+          for(let family of names) {
+            lines.push(`${capital(family)}: ${families[family].sort(byRank).map(id => capital(generator.bossTitle(id))).join(', ')}`)
+          }
+        }
+      }
+      for(let i=lines.length-1;i>=0;i--) {
+        ws.sendPacket('announcement', lines[i])
+      }
     },
     becomeBoss: function(targets, ws, name) {
       let id = generator.findBoss(name)
@@ -214,23 +291,23 @@
       return Object.keys(dim.bodies).filter(k => k.startsWith('code:') && k in dim.weapons).sort()
     },
     findCode: function(dim, name) {
-      const ids = commands.codeIds(dim), n = String(name || '').toLowerCase().replace(/^code:/, '')
+      let ids = commands.codeIds(dim), n = String(name || '').toLowerCase().replace(/^code:/, '')
       if(ids.indexOf('code:' + n) >= 0) { return 'code:' + n }
-      const found = ids.filter(k => k.slice(5).startsWith(n) || String(dim.bodies[k].name).toLowerCase().replace(/ /g, '').startsWith(n.replace(/ /g, '')))
+      let found = ids.filter(k => k.slice(5).startsWith(n) || String(dim.bodies[k].name).toLowerCase().replace(/ /g, '').startsWith(n.replace(/ /g, '')))
       return found.length === 1 ? found[0] : false
     },
     listCodes: function(tank, ws) {
-      const ids = commands.codeIds(tank.dim)
+      let ids = commands.codeIds(tank.dim)
       if(!ids.length) { return ws.sendPacket('announcement', 'There are no tank codes. Put one in tankData/codes and restart.') }
       ws.sendPacket('announcement', 'Tank codes: ' + ids.map(k => k.slice(5)).join(', '))
     },
     becomeCode: function(targets, ws, name) {
-      const dim = targets[0].dim
-      const id = commands.findCode(dim, name)
+      let dim = targets[0].dim
+      let id = commands.findCode(dim, name)
       if(!id) { return ws.sendPacket('announcement', `There is no single tank code matching '${name}'. Type /tankcode to list them.`) }
       let changed = 0
       for(let i=targets.length-1;i>=0;i--) {
-        const t = targets[i]
+        let t = targets[i]
         if(!t || t.objectType !== 'tank' || t.static || !t.alive || t.dim !== dim) { continue }
         t.removeBullets()
         generator.setTankWeapon(t, id)

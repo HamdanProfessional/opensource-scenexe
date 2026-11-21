@@ -76,6 +76,9 @@
     isPlayer: function(tank) {
       return !!(tank && tank.ws && tank.ws.data && tank.ws.data.isPlayer)
     },
+    isOnline: function(tank) {
+      return dimension.isPlayer(tank) && tank.ws.data.uid >= 0
+    },
     antilag: function(dim, full) {
       let result = { full: !!full, trimmed: [], bullets: 0, bots: 0, shapes: 0 }
       let before = dim.bullets.length
@@ -96,7 +99,7 @@
           result.shapes = extra
         }
         let now = Date.now()
-        if(!(now - dim.antilagNoticeAt < 10000)) {
+        if(now - (dim.antilagNoticeAt || 0) > 10000) {
           dim.antilagNoticeAt = now
           for(let i=dim.tanks.length-1;i>=0;i--) {
             let t = dim.tanks[i]
@@ -125,13 +128,13 @@
       result.bullets = before - dim.bullets.length
       return result
     },
+    notify: function(text) {
+      console.log(text)
+      if(args.parentPort && !args.standalone) { args.parentPort.postMessage(['antilag', text]) }
+    },
     collisionFailed: function(dim, error) {
-      let now = Date.now()
-      if(!(now - dim.collisionErrorAt < 10000)) {
-        dim.collisionErrorAt = now
-        let text = `antilag: the collision check failed in ${dim.name} (${error && error.message || error}), so its bullets and bots were cleared`
-        console.log(text)
-        if(args.parentPort && !args.standalone) { args.parentPort.postMessage(['antilag', text]) }
+      if(Date.now() - (dim.antilagNoticeAt || 0) > 10000) {
+        dimension.notify(`antilag: the collision check failed in ${dim.name} (${error && error.message || error}), so its bullets and bots were cleared`)
       }
       dimension.antilag(dim, true)
     },

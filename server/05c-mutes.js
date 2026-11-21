@@ -38,7 +38,7 @@ const mutes = (function() {
     const mute = {
       ip: c._ip ? ipGroup(c._ip) : '',
       account: c.accountName ? String(c.accountName).toLowerCase() : '',
-      name: name || (c.data && c.data.name) || '',
+      name: name || c.data.name || '',
       until: ms ? Date.now() + ms : 0,
       reason: reason || '',
       by: by || '',
@@ -59,7 +59,7 @@ const mutes = (function() {
   }
 
   const describe = function(mute) {
-    const time = mute.until ? `for ${durations.format(mute.until - Date.now())}` : 'permanently'
+    const time = durations.span(mute.until && mute.until - Date.now())
     return `You are muted ${time}${mute.reason ? ': ' + mute.reason : ''}.`
   }
 
